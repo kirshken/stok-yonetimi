@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Stok Yönetimi - yerel, bağımsız (sadece Python standart kütüphanesi). Çalıştır: python3 app.py"""
-import csv, io, json, os, re, shutil, sqlite3, sys, tempfile, threading, time, uuid, webbrowser, zipfile
-from datetime import date, datetime, timedelta
+import csv, hashlib, io, json, os, re, secrets, shutil, socket, ssl, sqlite3, sys, tempfile, threading, time, uuid, webbrowser, zipfile
+from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -52,6 +52,10 @@ def now(): return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 def cfg():
     try: return json.load(open(CFG, encoding="utf-8"))
     except Exception: return {}
+
+def save_cfg(upd):
+    c = cfg(); c.update(upd)
+    json.dump(c, open(CFG, "w", encoding="utf-8"), ensure_ascii=False)
 
 def make_backup(reason="otomatik"):
     """Tutarlı anlık görüntü (db + görseller) -> yedekler/*.zip, ayrıca ek klasöre kopya."""
@@ -186,7 +190,7 @@ def inbound(c, d):
                         (s["id"], lot, exp, qty, json.dumps(d.get("attrs") or {}, ensure_ascii=False), now())).lastrowid
     mid = c.execute("INSERT INTO movements(type,sku_id,batch_id,qty,ref,note,ts) VALUES('in',?,?,?,?,?,?)",
                     (s["id"], bid, qty, d.get("ref"), d.get("note"), now())).lastrowid
-    return {"movement_id": mid, "product": s["pname"], "sku": s["name"], "qty": qty, "lot": lot, "expiry": exp, "weight_g": s["weight_g"]}
+    return {"movement_id": mid, "product": s["pname"], "sku": s["name"], "qty": qty, "lot": lot, "expiry": exp, "weight_g": s["weight_g"], "image": s["image"]}
 
 def outbound(c, d):
     # Tek okutma = tek adet. Çoklu çıkış yok. FEFO: en yakın SKT önce.
@@ -202,7 +206,7 @@ def outbound(c, d):
     c.execute("UPDATE batches SET qty=qty-1 WHERE id=?", (b["id"],))
     mid = c.execute("INSERT INTO movements(type,sku_id,batch_id,qty,ref,note,ts) VALUES('out',?,?,1,?,?,?)", (s["id"], b["id"], ref, d.get("note"), now())).lastrowid
     left = c.execute("SELECT COALESCE(SUM(qty),0) FROM batches WHERE sku_id=?", (s["id"],)).fetchone()[0]
-    return {"movement_id": mid, "product": s["pname"], "sku": s["name"], "lot": b["lot"], "expiry": b["expiry"], "left": left, "weight_g": s["weight_g"]}
+    return {"movement_id": mid, "product": s["pname"], "sku": s["name"], "lot": b["lot"], "expiry": b["expiry"], "left": left, "weight_g": s["weight_g"], "image": s["image"], "barcode": s["barcode"]}
 
 def undo(c, mid):
     m = c.execute("SELECT * FROM movements WHERE id=?", (mid,)).fetchone()
@@ -245,30 +249,180 @@ def csv_out(header, data):
     f = io.StringIO(); w = csv.writer(f, delimiter=";"); w.writerow(header); w.writerows(data)
     return ("\ufeff" + f.getvalue()).encode("utf-8")
 
+def order_undo(c, d):
+    ref = (d.get("ref") or "").strip(); s = lookup(c, d.get("barcode", ""))
+    if not ref: raise Err("Sipariş numarası zorunlu")
+    if not s: raise Err("Barkod tanımlı değil")
+    m = c.execute("SELECT id FROM movements WHERE type='out' AND undone=0 AND ref=? AND sku_id=? ORDER BY id DESC LIMIT 1", (ref, s["id"])).fetchone()
+    if not m: raise Err("Bu siparişte bu üründen geri alınacak çıkış yok")
+    undo(c, m["id"])
+    return {"product": s["pname"], "sku": s["name"], "image": s["image"]}
+
+def _norm(h): return (h or "").strip().lower().translate(str.maketrans("üıöşçğâî", "uioscgai"))
+
 def import_csv(c, text):
-    # sütunlar: urun;marka;kategori;varyant;barkod;gramaj
-    rd = csv.DictReader(io.StringIO(text), delimiter=";" if ";" in text.split("\n")[0] else ",")
-    n = 0
-    for r in rd:
-        r = {(k or "").strip().lower(): (v or "").strip() for k, v in r.items()}
-        name, bc = r.get("urun") or r.get("ürün"), r.get("barkod")
-        if not name or not bc: continue
-        ex = c.execute("SELECT id FROM skus WHERE barcode=?", (bc,)).fetchone()
-        if ex: continue
+    text = text.lstrip("\ufeff")
+    first = text.split("\n")[0]
+    rd = csv.reader(io.StringIO(text), delimiter=";" if first.count(";") >= first.count(",") else ",")
+    head = next(rd, None)
+    if not head: raise Err("Boş dosya")
+    keys = [_norm(h) for h in head]
+    res = {"imported": 0, "skipped": 0, "errors": []}
+    for ln, row in enumerate(rd, start=2):
+        if not any(x.strip() for x in row): continue
+        r = {}; pa = {}; sa = {}
+        for h, k, v in zip(head, keys, row):
+            v = v.strip()
+            if k.startswith("urun_ozel:"):
+                if v: pa[h.split(":", 1)[1].strip()] = v
+            elif k.startswith("varyant_ozel:"):
+                if v: sa[h.split(":", 1)[1].strip()] = v
+            else: r[k] = v
+        name, bc = r.get("urun"), r.get("barkod")
+        if not name or not bc: res["errors"].append(f"Satır {ln}: ürün adı ve barkod zorunlu"); continue
+        if c.execute("SELECT 1 FROM skus WHERE barcode=?", (bc,)).fetchone(): res["skipped"] += 1; continue
+        try: w = float(r["gramaj"].replace(",", ".")) if r.get("gramaj") else None
+        except ValueError: res["errors"].append(f"Satır {ln}: gramaj sayı olmalı"); continue
+        for scope, a in (("product", pa), ("sku", sa)):
+            for fname in a: c.execute("INSERT OR IGNORE INTO fields(scope,name) VALUES(?,?)", (scope, fname))
+        sku = (r.get("varyant") or "Standart", bc, w, json.dumps(sa, ensure_ascii=False))
         p = c.execute("SELECT id FROM products WHERE name=? AND active=1", (name,)).fetchone()
-        sku = {"name": r.get("varyant") or "Standart", "barcode": bc, "weight_g": (r.get("gramaj") or "").replace(",", ".") or None}
-        if p: save_product(c, {"name": name, "skus": [sku]}, None) if False else c.execute(
-            "INSERT INTO skus(product_id,name,barcode,weight_g) VALUES(?,?,?,?)", (p["id"], sku["name"], bc, float(sku["weight_g"]) if sku["weight_g"] else None))
-        else: save_product(c, {"name": name, "brand": r.get("marka"), "category": r.get("kategori"), "skus": [sku]})
-        n += 1
-    return {"imported": n}
+        if p: c.execute("INSERT INTO skus(product_id,name,barcode,weight_g,attrs) VALUES(?,?,?,?,?)", (p["id"],) + sku)
+        else:
+            skt = r.get("skt_takibi", "").lower() not in ("hayir", "hayır", "0", "yok", "no")
+            try: ms = int(float(r.get("min_stok") or 0))
+            except ValueError: ms = 0
+            pid = c.execute("INSERT INTO products(name,brand,category,unit,min_stock,track_expiry,attrs,notes,created) VALUES(?,?,?,?,?,?,?,?,?)",
+                (name, r.get("marka"), r.get("kategori"), r.get("birim") or "adet", ms, 1 if skt else 0, json.dumps(pa, ensure_ascii=False), r.get("notlar"), now())).lastrowid
+            c.execute("INSERT INTO skus(product_id,name,barcode,weight_g,attrs) VALUES(?,?,?,?,?)", (pid,) + sku)
+        res["imported"] += 1
+    return res
+
+def export_products(c):
+    fl = rows(c, "SELECT * FROM fields ORDER BY scope,name")
+    head = ["urun", "marka", "kategori", "varyant", "barkod", "gramaj", "birim", "min_stok", "skt_takibi", "notlar", "mevcut_stok"]
+    head += [("urun_ozel:" if f["scope"] == "product" else "varyant_ozel:") + f["name"] for f in fl if f["scope"] in ("product", "sku")]
+    out = []
+    for p in products_list(c):
+        for s in p["skus"]:
+            r = [p["name"], p["brand"], p["category"], s["name"], s["barcode"], s["weight_g"], p["unit"], p["min_stock"], "evet" if p["track_expiry"] else "hayir", p["notes"], s["stock"]]
+            r += [(p["attrs"] if f["scope"] == "product" else s["attrs"]).get(f["name"], "") for f in fl if f["scope"] in ("product", "sku")]
+            out.append(r)
+    return csv_out(head, out)
+
+# ---------------- Ağ modu (telefon): HTTPS + PIN ----------------
+LAN = {"srv": None, "port": None, "err": None, "tls": False, "ips": []}
+SESS = {}; FAILS = {}
+LOGIN_HTML = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Giriş</title>
+<style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
+.b{background:#1e293b;padding:28px;border-radius:18px;width:min(92vw,340px)}h2{margin:0 0 14px}input{width:100%;padding:14px;font-size:22px;border-radius:10px;border:0;text-align:center;letter-spacing:6px}
+button{width:100%;margin-top:12px;padding:14px;font-size:16px;border:0;border-radius:10px;background:#6366f1;color:#fff}#e{color:#fca5a5;margin-top:10px;min-height:20px}</style>
+<div class=b><h2>Stok Yönetimi</h2><input id=p type=password inputmode=numeric autocomplete=current-password placeholder="PIN" autofocus><button onclick=go()>Giriş</button><div id=e></div></div>
+<script>p.onkeydown=e=>e.key=='Enter'&&go();async function go(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:p.value})});if(r.ok)location.reload();else e.textContent=(await r.json()).error}</script>"""
+
+def hash_pin(pin, salt): return hashlib.pbkdf2_hmac("sha256", pin.encode(), bytes.fromhex(salt), 120000).hex()
+
+def local_ips():
+    found = []
+    for target in ("8.8.8.8", "10.255.255.255", "172.20.10.1"):
+        try:
+            t = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); t.connect((target, 9)); found.append(t.getsockname()[0]); t.close()
+        except Exception: pass
+    try:
+        for i in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET): found.append(i[4][0])
+    except Exception: pass
+    out = []
+    for ip in found:
+        if ip and not ip.startswith(("127.", "169.254.", "0.")) and ip not in out: out.append(ip)
+    return out
+
+def ensure_cert(ips):
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    import ipaddress
+    cp, kp, mp = (os.path.join(DATA, n) for n in ("cert.pem", "key.pem", "cert.json"))
+    known = []
+    try: known = json.load(open(mp))["ips"]
+    except Exception: pass
+    if os.path.exists(cp) and os.path.exists(kp) and all(i in known for i in ips): return cp, kp
+    allips = sorted(set(known) | set(ips))
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Stok Yonetimi")])
+    san = [x509.DNSName("localhost")] + [x509.IPAddress(ipaddress.ip_address(i)) for i in allips]
+    nb = datetime.now(timezone.utc) - timedelta(days=1)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(nb).not_valid_after(nb + timedelta(days=3650)).add_extension(x509.SubjectAlternativeName(san), False).sign(key, hashes.SHA256()))
+    open(cp, "wb").write(cert.public_bytes(serialization.Encoding.PEM))
+    open(kp, "wb").write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL, serialization.NoEncryption()))
+    json.dump({"ips": allips}, open(mp, "w"))
+    return cp, kp
+
+class QuietServer(ThreadingHTTPServer):
+    daemon_threads = True
+    def handle_error(self, request, client_address): pass
+
+def stop_lan():
+    if LAN["srv"]:
+        try: LAN["srv"].shutdown(); LAN["srv"].server_close()
+        except Exception: pass
+    LAN.update(srv=None, port=None)
+    SESS.clear()
+
+def start_lan(base_port):
+    stop_lan(); LAN.update(err=None, tls=False); LAN["ips"] = local_ips()
+    ctx = None
+    try:
+        cp, kp = ensure_cert(LAN["ips"] or ["127.0.0.1"])
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); ctx.load_cert_chain(cp, kp)
+    except Exception as e:
+        LAN["err"] = "HTTPS sertifikası üretilemedi (kamera telefonda çalışmayabilir): " + repr(e)
+    for p in range(base_port + 1, base_port + 21):
+        try: srv = QuietServer(("0.0.0.0", p), HL); break
+        except OSError: srv = None
+    if not srv: LAN["err"] = "Ağ portu açılamadı"; return
+    srv.tls = bool(ctx)
+    if ctx: srv.socket = ctx.wrap_socket(srv.socket, server_side=True, do_handshake_on_connect=False); LAN["tls"] = True
+    LAN.update(srv=srv, port=p)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+def lan_status():
+    c = cfg()
+    sch = "https" if LAN["tls"] else "http"
+    return {"enabled": bool(LAN["srv"]), "has_pin": bool(c.get("pin_hash")), "tls": LAN["tls"], "err": LAN["err"], "port": LAN["port"],
+            "urls": [f"{sch}://{ip}:{LAN['port']}" for ip in (LAN["ips"] if LAN["srv"] else local_ips())] if LAN["srv"] else [], "sessions": len(SESS)}
+
+def lan_set(d):
+    c = cfg(); pin = (d.get("pin") or "").strip()
+    if pin:
+        if len(pin) < 6: raise Err("PIN en az 6 karakter olmalı")
+        salt = secrets.token_hex(8); save_cfg({"pin_salt": salt, "pin_hash": hash_pin(pin, salt)}); SESS.clear()
+    if d.get("enabled"):
+        if not cfg().get("pin_hash"): raise Err("Önce bir PIN belirleyin")
+        save_cfg({"lan": True}); start_lan(PORT_ACTUAL[0])
+    elif "enabled" in d:
+        save_cfg({"lan": False}); stop_lan()
+    return lan_status()
+
+PORT_ACTUAL = [PORT]
 
 class H(BaseHTTPRequestHandler):
+    lan = False
     def log_message(self, *a): pass
+    def setup(self):
+        if getattr(self.server, "tls", False):
+            self.request.settimeout(10); self.request.do_handshake()
+        super().setup()
+    def sid_ok(self):
+        for part in (self.headers.get("Cookie") or "").split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == "sid" and SESS.get(v, 0) > time.time(): return True
+        return False
     def send(self, code, body, ctype="application/json", extra=None):
         if isinstance(body, (dict, list)): body = json.dumps(body, ensure_ascii=False).encode()
         elif isinstance(body, str): body = body.encode()
-        self.send_response(code); self.send_header("Content-Type", ctype + ("; charset=utf-8" if "text" in ctype or "json" in ctype else ""))
+        self.send_response(code); self.send_header("Content-Type", ctype + ("; charset=utf-8" if "text" in ctype or "json" in ctype or "javascript" in ctype else ""))
         self.send_header("Content-Length", str(len(body)))
         for k, v in (extra or {}).items(): self.send_header(k, v)
         self.end_headers(); self.wfile.write(body)
@@ -277,6 +431,29 @@ class H(BaseHTTPRequestHandler):
         u = urlparse(self.path); path = u.path; qs = {k: v[0] for k, v in parse_qs(u.query).items()}
         n = int(self.headers.get("Content-Length") or 0); raw = self.rfile.read(n) if n else b""
         try:
+            host = self.headers.get("Host", ""); org = self.headers.get("Origin")
+            if org and urlparse(org).netloc != host: return self.send(403, {"error": "Geçersiz istek kaynağı"})
+            if self.lan:
+                ip = self.client_address[0]
+                if path == "/api/login" and method == "POST":
+                    f = FAILS.get(ip, [0, 0])
+                    if f[1] > time.time(): return self.send(429, {"error": "Çok fazla hatalı deneme, 1 dakika bekleyin"})
+                    c0 = cfg(); pin = (json.loads(raw or b"{}").get("pin") or "")
+                    if c0.get("pin_hash") and secrets.compare_digest(hash_pin(pin, c0["pin_salt"]), c0["pin_hash"]):
+                        FAILS.pop(ip, None); tok = secrets.token_urlsafe(24); SESS[tok] = time.time() + 30 * 86400
+                        return self.send(200, {"ok": True}, extra={"Set-Cookie": f"sid={tok}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000" + ("; Secure" if LAN["tls"] else "")})
+                    f[0] += 1
+                    if f[0] >= 5: f = [0, time.time() + 60]
+                    FAILS[ip] = f; time.sleep(0.5)
+                    return self.send(401, {"error": "PIN hatalı"})
+                if not self.sid_ok():
+                    if method == "GET" and path == "/": return self.send(200, LOGIN_HTML, "text/html")
+                    return self.send(401, {"error": "Giriş gerekli"})
+                if path.startswith(("/api/lan", "/api/backup/")): return self.send(403, {"error": "Bu işlem yalnızca bilgisayardan yapılabilir"})
+            if method == "GET" and path.startswith("/static/"):
+                f = os.path.join(BASE, "static", os.path.basename(path))
+                if not os.path.exists(f): return self.send(404, "")
+                return self.send(200, open(f, "rb").read(), "application/javascript", {"Cache-Control": "max-age=86400"})
             if method == "GET" and path == "/": return self.send(200, open(os.path.join(BASE, "index.html"), encoding="utf-8").read(), "text/html")
             if method == "GET" and path.startswith("/img/"):
                 f = os.path.join(IMG, os.path.basename(path)); 
@@ -293,7 +470,7 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, open(f, "rb").read(), "application/zip", {"Content-Disposition": "attachment; filename=" + os.path.basename(f)})
             if method == "POST" and path == "/api/backup/now": return self.send(200, {"name": make_backup("elle")})
             if method == "POST" and path == "/api/backup/config":
-                j = json.loads(raw); json.dump({"mirror_dir": (j.get("mirror_dir") or "").strip()}, open(CFG, "w", encoding="utf-8")); return self.send(200, {"name": make_backup("elle")})
+                j = json.loads(raw); save_cfg({"mirror_dir": (j.get("mirror_dir") or "").strip()}); return self.send(200, {"name": make_backup("elle")})
             if method == "POST" and path == "/api/backup/restore":
                 tf = os.path.join(tempfile.mkdtemp(), "r.zip"); open(tf, "wb").write(raw); restore_zip(tf); return self.send(200, {"ok": True})
             if method == "POST" and path == "/api/backup/restore-local":
@@ -305,15 +482,20 @@ class H(BaseHTTPRequestHandler):
                     if path == "/api/lookup":
                         s = lookup(c, qs.get("barcode", "")); return self.send(200, s or {"error": "NOT_FOUND"}, ) if s else self.send(404, {"error": "NOT_FOUND"})
                     if path == "/api/dashboard": return self.send(200, dashboard(c))
+                    if path == "/api/lan": return self.send(200, lan_status())
+                    if path == "/api/orders/recent": return self.send(200, rows(c, "SELECT ref, COUNT(*) n, SUM(undone) undone, MAX(ts) last FROM movements WHERE type='out' AND ref IS NOT NULL GROUP BY ref ORDER BY MAX(id) DESC LIMIT 15"))
+                    if path == "/api/export/urunler.csv": return self.send(200, export_products(c), "text/csv", {"Content-Disposition": "attachment; filename=urunler.csv"})
                     if path == "/api/fields": return self.send(200, rows(c, "SELECT * FROM fields ORDER BY scope,name"))
                     if path == "/api/batches":
-                        return self.send(200, rows(c, "SELECT b.*, s.barcode, s.name sname, p.name pname FROM batches b JOIN skus s ON s.id=b.sku_id JOIN products p ON p.id=s.product_id WHERE b.qty>0 ORDER BY b.expiry IS NULL, b.expiry"))
+                        return self.send(200, rows(c, "SELECT b.*, s.barcode, s.name sname, p.id pid, p.category, p.brand, p.image, p.name pname FROM batches b JOIN skus s ON s.id=b.sku_id JOIN products p ON p.id=s.product_id WHERE b.qty>0 AND p.active=1 ORDER BY b.expiry IS NULL, b.expiry"))
                     if path == "/api/movements":
-                        q = "SELECT m.*, s.barcode, p.name pname, s.name sname, b.lot, b.expiry FROM movements m LEFT JOIN skus s ON s.id=m.sku_id LEFT JOIN products p ON p.id=s.product_id LEFT JOIN batches b ON b.id=m.batch_id"
-                        a = []
-                        if qs.get("type"): q += " WHERE m.type=?"; a.append(qs["type"])
-                        if qs.get("ref"): q += (" AND" if a else " WHERE") + " m.ref LIKE ?"; a.append("%" + qs["ref"] + "%")
-                        return self.send(200, rows(c, q + " ORDER BY m.id DESC LIMIT ?", a + [int(qs.get("limit", 200))]))
+                        q = "SELECT m.*, s.barcode, p.id pid, p.category, p.brand, p.name pname, s.name sname, b.lot, b.expiry FROM movements m LEFT JOIN skus s ON s.id=m.sku_id LEFT JOIN products p ON p.id=s.product_id LEFT JOIN batches b ON b.id=m.batch_id"
+                        w, a = [], []
+                        if qs.get("type"): w.append("m.type=?"); a.append(qs["type"])
+                        if qs.get("ref"): (w.append("m.ref=?"), a.append(qs["ref"])) if qs.get("exact") else (w.append("m.ref LIKE ?"), a.append("%" + qs["ref"] + "%"))
+                        if qs.get("from"): w.append("m.ts>=?"); a.append(qs["from"] + " 00:00:00")
+                        if qs.get("to"): w.append("m.ts<=?"); a.append(qs["to"] + " 23:59:59")
+                        return self.send(200, rows(c, q + (" WHERE " + " AND ".join(w) if w else "") + " ORDER BY m.id DESC LIMIT ?", a + [int(qs.get("limit", 200))]))
                     if path == "/api/export/stok.csv":
                         d = [[b["pname"], b["sname"], b["barcode"], b["lot"], b["expiry"], b["qty"]] for b in rows(c, "SELECT b.*, s.barcode, s.name sname, p.name pname FROM batches b JOIN skus s ON s.id=b.sku_id JOIN products p ON p.id=s.product_id WHERE b.qty>0")]
                         return self.send(200, csv_out(["Ürün", "Varyant", "Barkod", "Parti", "SKT", "Adet"], d), "text/csv", {"Content-Disposition": "attachment; filename=stok.csv"})
@@ -324,6 +506,8 @@ class H(BaseHTTPRequestHandler):
                     if path == "/api/products": return self.send(200, {"id": save_product(c, data)})
                     if path == "/api/inbound": return self.send(200, inbound(c, data))
                     if path == "/api/outbound": return self.send(200, outbound(c, data))
+                    if path == "/api/lan": return self.send(200, lan_set(data))
+                    if path == "/api/order-undo": return self.send(200, order_undo(c, data))
                     if path == "/api/adjust": return self.send(200, adjust(c, data))
                     if path == "/api/import": return self.send(200, import_csv(c, raw.decode("utf-8-sig")))
                     if path == "/api/fields":
@@ -353,6 +537,9 @@ class H(BaseHTTPRequestHandler):
     def do_PUT(self): self.handle_any("PUT")
     def do_DELETE(self): self.handle_any("DELETE")
 
+class HL(H):
+    lan = True
+
 def already_running(port):
     try:
         import urllib.request
@@ -365,12 +552,13 @@ if __name__ == "__main__":
         except Exception: pass
     srv, port = None, PORT
     for p in range(PORT, PORT + 20):
-        try: srv = ThreadingHTTPServer(("127.0.0.1", p), H); port = p; break
+        try: srv = QuietServer(("127.0.0.1", p), H); port = p; break
         except OSError:
             if already_running(p):
                 print("Uygulama zaten açık, tarayıcıda açılıyor…"); webbrowser.open(f"http://127.0.0.1:{p}"); sys.exit(0)
     if not srv: sys.exit("Boş port bulunamadı")
-    url = f"http://127.0.0.1:{port}"
+    url = f"http://127.0.0.1:{port}"; PORT_ACTUAL[0] = port
+    if cfg().get("lan") and cfg().get("pin_hash"): start_lan(port)
     print("Stok Yonetimi calisiyor:", url)
     print("Veri klasoru:", DATA)
     print("Bu pencereyi KAPATMAYIN. Kapatmak icin pencereyi kapatin (kapanista otomatik yedek alinir).")

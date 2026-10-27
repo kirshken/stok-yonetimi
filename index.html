@@ -1,135 +1,265 @@
 <!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Stok Yönetimi</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#6366f1">
 <style>
-:root{--b:#2563eb;--g:#16a34a;--r:#dc2626;--o:#d97706;--bg:#f3f4f6;--c:#fff;--t:#111827;--m:#6b7280;--bd:#e5e7eb}
-*{box-sizing:border-box}body{margin:0;font:15px -apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--t)}
-nav{background:#111827;display:flex;gap:2px;padding:0 12px;position:sticky;top:0;z-index:5}
-nav button{background:none;border:0;color:#cbd5e1;padding:14px 16px;font-size:15px;cursor:pointer}
-nav button.on{color:#fff;border-bottom:3px solid var(--b)}
-main{max-width:1100px;margin:16px auto;padding:0 12px}
-.card{background:var(--c);border:1px solid var(--bd);border-radius:10px;padding:16px;margin-bottom:14px}
-h2{margin:0 0 12px;font-size:18px}h3{margin:14px 0 8px;font-size:15px}
-input,select,textarea{padding:9px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:15px;width:100%;background:#fff}
-label{display:block;font-size:12px;color:var(--m);margin:8px 0 3px}
-button.p,button.s,button.d{padding:9px 14px;border-radius:7px;border:0;cursor:pointer;font-size:14px}
-button.p{background:var(--b);color:#fff}button.s{background:#e5e7eb}button.d{background:#fee2e2;color:var(--r)}
-.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:140px}
-table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);font-size:14px}th{color:var(--m);font-size:12px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
-.stat{background:var(--c);border:1px solid var(--bd);border-radius:10px;padding:14px}.stat b{font-size:26px;display:block}
-.scan{font-size:22px;padding:14px;border:2px solid var(--b)}
-.msg{padding:12px;border-radius:8px;margin:10px 0;font-size:16px}.ok{background:#dcfce7;color:#14532d}.err{background:#fee2e2;color:#7f1d1d}
-.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;background:#e5e7eb}.tag.r{background:#fee2e2;color:var(--r)}.tag.o{background:#fef3c7;color:var(--o)}.tag.g{background:#dcfce7;color:var(--g)}
-.thumb{width:44px;height:44px;object-fit:cover;border-radius:6px;background:#eee;vertical-align:middle}
-.modal{position:fixed;inset:0;background:#0007;display:none;align-items:flex-start;justify-content:center;overflow:auto;z-index:10;padding:20px}
-.modal.show{display:flex}.modal .card{width:760px;max-width:100%}
-.var{border:1px dashed #cbd5e1;border-radius:8px;padding:10px;margin-bottom:8px}
-.pv{max-width:140px;max-height:140px;border-radius:8px;display:block;margin:6px 0}
-.hide{display:none}.m{color:var(--m)}
+:root{--bg:#f4f5fb;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#e8eaf2;--acc:#6366f1;--acc2:#eef0ff;--ok:#16a34a;--ok2:#dcfce7;--warn:#d97706;--warn2:#fef3c7;--bad:#dc2626;--bad2:#fee2e2;--sh:0 1px 2px #0f172a0d,0 4px 16px #0f172a0a;--r:14px}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1020;--card:#151b2e;--text:#e6e9f2;--muted:#94a3b8;--line:#262e47;--acc:#818cf8;--acc2:#1e2547;--ok:#4ade80;--ok2:#12301f;--warn:#fbbf24;--warn2:#3a2c0b;--bad:#f87171;--bad2:#3b1618;--sh:none}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html{scroll-behavior:smooth}
+body{margin:0;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+.side{position:fixed;left:0;top:0;bottom:0;width:236px;background:var(--card);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:4px;z-index:5}
+.logo{font-weight:800;font-size:18px;padding:6px 12px 16px;display:flex;gap:10px;align-items:center}.logo i{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#a855f7);display:inline-block}
+.nb{display:flex;align-items:center;gap:12px;padding:11px 12px;border:0;background:none;color:var(--muted);border-radius:11px;font-size:15px;cursor:pointer;text-align:left;width:100%}
+.nb:hover{background:var(--acc2)}.nb.on{background:var(--acc2);color:var(--acc);font-weight:600}
+svg.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+main{margin-left:236px;padding:26px 28px 40px;max-width:1280px}
+.tabbar{display:none}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:0 0 12px}h3{font-size:14px;margin:16px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.sub{color:var(--muted);margin:0 0 18px}
+.card{background:var(--card);border-radius:var(--r);padding:18px;box-shadow:var(--sh);border:1px solid var(--line);margin-bottom:16px}
+.grid{display:grid;gap:14px}.g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))}
+.kpi{padding:16px;border-radius:var(--r);background:var(--card);border:1px solid var(--line);box-shadow:var(--sh)}.kpi small{color:var(--muted);display:block}.kpi b{font-size:28px;letter-spacing:-.02em}
+.kpi.bad b{color:var(--bad)}.kpi.warn b{color:var(--warn)}.kpi.ok b{color:var(--ok)}
+input,select,textarea{font:inherit;color:var(--text);background:var(--card);padding:10px 12px;border:1px solid var(--line);border-radius:10px;width:100%;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc2)}
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}.row>*{flex:1;min-width:130px}.row>.fit{flex:none;min-width:0}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 16px}
+.btn{background:var(--acc);color:#fff;font-weight:600}.btn.s{background:var(--acc2);color:var(--acc)}.btn.d{background:var(--bad2);color:var(--bad)}.btn.sm{padding:6px 11px;font-size:13px}.btn:disabled{opacity:.4;cursor:default}
+.scanbox{display:flex;gap:8px}.scan{font-size:22px;padding:16px;border:2px solid var(--acc);border-radius:14px}
+.cambtn{background:var(--acc);color:#fff;border-radius:14px;padding:0 18px;flex:none}.cambtn svg{width:26px;height:26px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{padding:6px 12px;border-radius:99px;background:var(--acc2);color:var(--acc);font-size:13px;cursor:pointer;border:1px solid transparent;font-weight:500;white-space:nowrap}.chip.on{background:var(--acc);color:#fff}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;background:var(--line);color:var(--muted)}.tag.r{background:var(--bad2);color:var(--bad)}.tag.o{background:var(--warn2);color:var(--warn)}.tag.g{background:var(--ok2);color:var(--ok)}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-size:14px;white-space:nowrap}th{color:var(--muted);font-size:12px;font-weight:600;cursor:default;user-select:none}th.so{cursor:pointer}tr.cl{cursor:pointer}tr.cl:hover td{background:var(--acc2)}
+.thumb{width:42px;height:42px;object-fit:cover;border-radius:10px;background:var(--line);flex:none}.thumb.big{width:96px;height:96px;border-radius:14px}
+.res{display:flex;gap:14px;align-items:center;padding:16px;border-radius:var(--r);margin:14px 0;border:2px solid}.res.ok{background:var(--ok2);border-color:var(--ok)}.res.err{background:var(--bad2);border-color:var(--bad)}.res b{font-size:19px}
+.modal{position:fixed;inset:0;background:#0f172a99;display:none;align-items:flex-start;justify-content:center;overflow:auto;z-index:20;padding:24px}.modal.show{display:flex}
+.sheet{background:var(--card);border-radius:18px;padding:20px;width:780px;max-width:100%;box-shadow:0 20px 60px #0006}
+.var{border:1px dashed var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:var(--bg)}
+#toasts{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;width:min(92vw,420px);pointer-events:none}
+.toast{padding:12px 16px;border-radius:12px;color:#fff;font-weight:600;box-shadow:0 8px 24px #0004;animation:in .2s}.toast.ok{background:#16a34a}.toast.err{background:#dc2626}.toast.info{background:#334155}@keyframes in{from{opacity:0;transform:translateY(-8px)}}
+.cam{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column}.cam .top{display:flex;gap:8px;padding:12px;justify-content:space-between;align-items:center;color:#fff}.cam #camv{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden}.cam #camv video{width:100%!important;max-height:100%;object-fit:cover}
+.cam .msg{color:#fff;padding:14px;text-align:center}
+.bar{height:8px;border-radius:5px;background:var(--acc);min-width:3px}.hide{display:none!important}.m{color:var(--muted)}
+.filters{background:var(--bg)}
+.qr{background:#fff;padding:8px;border-radius:12px;display:inline-block}.qr svg{display:block}
+.empty{padding:26px;text-align:center;color:var(--muted)}
+.plist{display:flex;flex-direction:column}.pr{display:flex;gap:12px;align-items:center;padding:11px 4px;border-bottom:1px solid var(--line);cursor:pointer}.pr:hover{background:var(--acc2)}.pr .nm{flex:1;min-width:0}.pr .nm div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:820px){
+ .side{display:none}main{margin:0;padding:16px 14px 100px}.filters{position:static}
+ .tabbar{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);z-index:10;padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+ .tabbar button{flex:1;background:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;padding:6px 2px;border-radius:12px}.tabbar button.on{color:var(--acc);background:var(--acc2)}
+ .g2{grid-template-columns:1fr}.modal{padding:0;align-items:flex-end}.sheet{border-radius:20px 20px 0 0;max-height:94vh;overflow:auto;width:100%}
+ .kpi b{font-size:23px}h1{font-size:21px}.scan{font-size:20px}
+}
 </style></head><body>
-<nav id="nav"></nav><main id="main"></main>
-<div class="modal" id="modal"><div class="card" id="mbody"></div></div>
+<aside class="side" id="side"></aside><main id="main"></main><nav class="tabbar" id="tabbar"></nav>
+<div id="toasts"></div><div class="modal" id="modal" onclick="if(event.target==this)closeM()"><div class="sheet" id="mbody"></div></div>
+<div class="cam hide" id="cam"><div class="top"><b id="camt">Barkodu kameraya tutun</b><span><button class="btn s sm" onclick="camPhoto()">📷 Fotoğraftan oku</button> <button class="btn d sm" onclick="camStop()">Kapat ✕</button></span></div><div id="camv"></div><div class="msg" id="camm"></div><input type="file" id="camf" accept="image/*" capture="environment" class="hide"></div>
 <script>
-const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const TABS=[['dash','Panel'],['in','Stok Girişi'],['out','Stok Çıkışı'],['prod','Ürünler'],['batch','Partiler / SKT'],['mov','Hareketler'],['set','Ayarlar']];
-let tab=localStorage.tab||'dash', fields=[], S={inLot:'',inExp:'',ref:''};
-async function api(p,o={}){const r=await fetch(p,o);let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw Object.assign(new Error(j.error||r.statusText),{data:j});return j}
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const REMOTE=!['127.0.0.1','localhost'].includes(location.hostname);
+const IC={dash:'<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',in:'<path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/>',out:'<path d="M12 15V3m0 0L8 7m4-4l4 4M4 21h16"/>',ret:'<path d="M3 7v6h6M3 13a9 9 0 1 0 3-7"/>',prod:'<path d="M21 8l-9-5-9 5v8l9 5 9-5V8zM3 8l9 5 9-5M12 13v8"/>',batch:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',mov:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',set:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>',menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',cam:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'};
+const ic=k=>`<svg class="ic" viewBox="0 0 24 24">${IC[k]}</svg>`;
+const TABS=[['dash','Panel'],['in','Stok Girişi'],['out','Stok Çıkışı'],['ret','Sipariş Geri Al'],['prod','Ürünler'],['batch','Partiler / SKT'],['mov','Hareketler'],['set','Ayarlar']];
+const MOB=['dash','in','out','ret'];
+let tab=localStorage.tab||'dash',fields=[],S={inLot:'',inExp:'',ref:''};
+function toast(m,t='info',ms=2600){const e=document.createElement('div');e.className='toast '+t;e.textContent=m;$('#toasts').appendChild(e);setTimeout(()=>e.remove(),ms)}
+async function api(p,o={}){const r=await fetch(p,o);let j={};try{j=await r.json()}catch(e){}if(r.status==401&&REMOTE){location.reload()}if(!r.ok)throw Object.assign(new Error(j.error||r.statusText),{data:j});return j}
 const post=(p,b)=>api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
-function beep(ok){try{const a=new AudioContext(),o=a.createOscillator();o.frequency.value=ok?880:220;o.connect(a.destination);o.start();o.stop(a.currentTime+(ok?.08:.35))}catch(e){}}
-function nav(){$('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k==tab?'on':''}" onclick="go('${k}')">${l}</button>`).join('')}
-async function go(t){tab=t;localStorage.tab=t;nav();fields=await api('/api/fields');await V[t]()}
-const fmtExp=e=>{if(!e)return '<span class="m">-</span>';const d=(new Date(e)-new Date(new Date().toDateString()))/864e5;return `<span class="tag ${d<0?'r':d<=30?'o':'g'}">${e}${d<0?' (geçmiş)':d<=30?` (${d} gün)`:''}</span>`};
+function beep(ok){try{const a=new AudioContext(),o=a.createOscillator();o.frequency.value=ok?880:200;o.connect(a.destination);o.start();o.stop(a.currentTime+(ok?.09:.4))}catch(e){}if(navigator.vibrate)navigator.vibrate(ok?30:[80,60,80])}
+const pad=n=>String(n).padStart(2,'0'),ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const today0=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
+const dleft=e=>e?Math.round((new Date(e+'T00:00:00')-today0())/864e5):null;
+const fmtExp=e=>{if(!e)return '<span class="m">–</span>';const d=dleft(e);return `<span class="tag ${d<0?'r':d<=30?'o':'g'}">${e}${d<0?' · geçmiş':d<=30?` · ${d} gün`:''}</span>`};
+function nav(){
+ $('#side').innerHTML=`<div class="logo"><i></i>Stok Yönetimi</div>`+TABS.map(([k,l])=>`<button class="nb ${k==tab?'on':''}" onclick="go('${k}')">${ic(k)}${l}</button>`).join('');
+ $('#tabbar').innerHTML=MOB.map(k=>`<button class="${k==tab?'on':''}" onclick="go('${k}')">${ic(k)}${{dash:'Panel',in:'Giriş',out:'Çıkış',ret:'Geri Al'}[k]}</button>`).join('')+`<button class="${MOB.includes(tab)?'':'on'}" onclick="moreMenu()">${ic('menu')}Menü</button>`}
+function moreMenu(){$('#mbody').innerHTML=`<h2>Menü</h2>`+TABS.filter(t=>!MOB.includes(t[0])).map(([k,l])=>`<button class="nb" onclick="closeM();go('${k}')">${ic(k)}${l}</button>`).join('');$('#modal').classList.add('show')}
+async function go(t){tab=t;localStorage.tab=t;nav();window.scrollTo(0,0);try{fields=await api('/api/fields')}catch(e){}await V[t]()}
+const closeM=()=>$('#modal').classList.remove('show');
 const V={};
-V.dash=async()=>{const d=await api('/api/dashboard');
-$('#main').innerHTML=`<div class="stats"><div class="stat"><b>${d.product_count}</b>Ürün</div><div class="stat"><b>${d.total_stock}</b>Toplam stok</div><div class="stat"><b>${d.today_in}</b>Bugün giriş</div><div class="stat"><b>${d.today_out}</b>Bugün çıkış</div></div><br>
-<div class="card"><h2>⛔ SKT'si geçmiş (${d.expired.length})</h2>${bt(d.expired)}</div>
-<div class="card"><h2>⏰ 30 gün içinde SKT (${d.expiring.length})</h2>${bt(d.expiring)}</div>
-<div class="card"><h2>📉 Minimum stok altı (${d.low.length})</h2><table><tr><th>Ürün</th><th>Stok</th><th>Min</th></tr>${d.low.map(p=>`<tr><td>${esc(p.name)}</td><td>${p.stock}</td><td>${p.min_stock}</td></tr>`).join('')||'<tr><td class="m">Yok</td></tr>'}</table></div>`};
-const bt=a=>`<table><tr><th>Ürün</th><th>Varyant</th><th>Barkod</th><th>Parti</th><th>SKT</th><th>Adet</th><th></th></tr>${a.map(b=>`<tr><td>${esc(b.pname)}</td><td>${esc(b.sname)}</td><td>${esc(b.barcode)}</td><td>${esc(b.lot)}</td><td>${fmtExp(b.expiry)}</td><td>${b.qty}</td><td><button class="s" onclick="adjDlg(${b.id},${b.qty},'${esc(b.pname).replace(/'/g,'')}')">Düzelt</button></td></tr>`).join('')||'<tr><td class="m">Kayıt yok</td></tr>'}</table>`;
+const head=(t,s)=>`<h1>${t}</h1><p class="sub">${s||''}</p>`;
+const camBtn=id=>`<button class="cambtn" type="button" onclick="camFor('${id}')" title="Kamerayla oku">${ic('cam')}</button>`;
 
+/* ---------- Kamera ---------- */
+let H5=null,CAMON=false,lastCode={c:'',t:0};
+function loadScript(src){return new Promise((ok,no)=>{if(document.querySelector(`script[src="${src}"]`))return ok();const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=no;document.head.appendChild(s)})}
+async function camScan(cb,title){
+ await loadScript('/static/html5-qrcode.min.js');
+ $('#cam').classList.remove('hide');$('#camt').textContent=title||'Barkodu kameraya tutun';$('#camm').textContent='';CAMON=true;$('#camv').innerHTML='';
+ window._camcb=cb;
+ if(!window.isSecureContext||!navigator.mediaDevices){$('#camm').innerHTML='Bu bağlantıda canlı kamera kullanılamıyor (HTTPS gerekli). <b>“Fotoğraftan oku”</b> ile barkodun fotoğrafını çekebilirsiniz.';return}
+ try{H5=new Html5Qrcode('camv',{formatsToSupport:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],experimentalFeatures:{useBarCodeDetectorIfSupported:true},verbose:false});
+  await H5.start({facingMode:'environment'},{fps:10,qrbox:(w,h)=>({width:Math.floor(Math.min(w*.9,380)),height:Math.floor(Math.min(h*.45,170))})},code=>{const n=Date.now();if(code==lastCode.c&&n-lastCode.t<2500)return;lastCode={c:code,t:n};window._camcb(code)},()=>{});
+ }catch(e){$('#camm').innerHTML='Kamera açılamadı: '+esc(e.message||e)+'<br>İzin verdiğinizden emin olun veya <b>“Fotoğraftan oku”</b> kullanın.'}}
+async function camStop(){CAMON=false;try{if(H5){await H5.stop();H5.clear()}}catch(e){}H5=null;$('#cam').classList.add('hide')}
+function camPhoto(){$('#camf').click()}
+$('#camf').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{await loadScript('/static/html5-qrcode.min.js');if(H5){try{await H5.stop()}catch(x){}H5=null}const t=new Html5Qrcode('camv');const code=await t.scanFile(f,false);window._camcb&&window._camcb(code)}catch(er){toast('Barkod okunamadı, daha yakından/net çekin','err',3500)}if(CAMON&&window.isSecureContext&&navigator.mediaDevices){camScan(window._camcb)}}
+function camFor(id,cont=true){camScan(code=>{const i=$('#'+id);i.value=code;i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));if(!cont)camStop()},'Barkodu kameraya tutun')}
+
+/* ---------- Giriş / Çıkış ---------- */
+const resBox=(ok,r,txt)=>`<div class="res ${ok?'ok':'err'}">${r&&r.image?`<img class="thumb big" src="/img/${r.image}">`:''}<div>${txt}</div></div>`;
 V.in=async()=>{
-$('#main').innerHTML=`<div class="card"><h2>Stok Girişi (Inbound)</h2>
-<div class="row"><div><label>Parti / Lot no (opsiyonel)</label><input id="lot" value="${esc(S.inLot)}"></div><div><label>SKT (YYYY-AA-GG)</label><input id="exp" type="date" value="${esc(S.inExp)}"></div><div><label>Her okutmada eklenecek adet</label><input id="qty" type="number" min="1" value="1"></div></div>
-<label>Barkod okut</label><input id="bc" class="scan" autofocus autocomplete="off" placeholder="Barkodu okutun…">
-<p class="m">Aynı parti/SKT ile art arda okutabilirsiniz; her okutma o partiye adet ekler. Parti/SKT değiştirmek için alanları güncelleyin.</p><div id="res"></div><h3>Bu oturum</h3><table id="log"></table></div>`;
-$('#bc').focus();
+$('#main').innerHTML=head('Stok Girişi','Barkodu okutun; her okutma seçili partiye adet ekler.')+`<div class="card"><div class="row"><div><label>Parti / Lot (opsiyonel)</label><input id="lot" value="${esc(S.inLot)}"></div><div><label>SKT</label><input id="exp" type="date" value="${esc(S.inExp)}"></div><div><label>Her okutmada adet</label><input id="qty" type="number" min="1" value="1"></div></div>
+<label>Barkod</label><div class="scanbox"><input id="bc" class="scan" autocomplete="off" placeholder="Okutun…" autofocus>${camBtn('bc')}</div><div id="res"></div></div><div class="card"><h2>Bu oturum</h2><div class="tw"><table id="log"></table></div></div>`;
+if(!REMOTE)$('#bc').focus();
 for(const i of['lot','exp'])$('#'+i).onchange=()=>{S.inLot=$('#lot').value;S.inExp=$('#exp').value};
 $('#bc').onkeydown=async e=>{if(e.key!='Enter')return;const bc=e.target.value.trim();if(!bc)return;e.target.value='';
- try{const r=await post('/api/inbound',{barcode:bc,qty:$('#qty').value,lot:$('#lot').value,expiry:$('#exp').value});beep(1);
-  $('#res').innerHTML=`<div class="msg ok">✔ ${esc(r.product)} – ${esc(r.sku)} +${r.qty} ${r.expiry?'(SKT '+r.expiry+')':''}</div>`;
-  $('#log').insertAdjacentHTML('afterbegin',`<tr><td>${new Date().toLocaleTimeString()}</td><td>${esc(r.product)} / ${esc(r.sku)}</td><td>+${r.qty}</td><td>${esc(r.lot||'')} ${r.expiry||''}</td><td><button class="d" onclick="undo(${r.movement_id},this)">Geri al</button></td></tr>`)}
- catch(er){beep(0);if(er.message=='NOT_FOUND'){$('#res').innerHTML=`<div class="msg err">Barkod tanımlı değil: <b>${esc(bc)}</b> <button class="p" onclick="editProd(null,'${esc(bc)}')">Şimdi tanımla</button></div>`}else $('#res').innerHTML=`<div class="msg err">${esc(er.message)}</div>`}
- $('#bc').focus()}};
-async function undo(id,btn){try{await post('/api/undo/'+id,{});btn.outerHTML='<span class="tag">geri alındı</span>'}catch(e){alert(e.message)}}
+ try{const r=await post('/api/inbound',{barcode:bc,qty:$('#qty').value,lot:$('#lot').value,expiry:$('#exp').value});beep(1);toast(`+${r.qty} ${r.product}`,'ok');
+  $('#res').innerHTML=resBox(1,r,`<b>${esc(r.product)}</b> · ${esc(r.sku)}<br>+${r.qty} adet ${r.expiry?'· SKT '+r.expiry:''} ${r.lot?'· Parti '+esc(r.lot):''}`);
+  $('#log').insertAdjacentHTML('afterbegin',`<tr><td>${new Date().toLocaleTimeString()}</td><td>${esc(r.product)} / ${esc(r.sku)}</td><td>+${r.qty}</td><td>${esc(r.lot||'')} ${r.expiry||''}</td><td><button class="btn d sm" onclick="undo(${r.movement_id},this)">Geri al</button></td></tr>`)}
+ catch(er){beep(0);if(er.message=='NOT_FOUND'){if(CAMON)camStop();$('#res').innerHTML=`<div class="res err"><div><b>Barkod tanımlı değil</b> ${esc(bc)}<br><button class="btn sm" style="margin-top:8px" onclick="editProd(null,'${esc(bc)}')">Şimdi tanımla</button></div></div>`}else{toast(er.message,'err',3500);$('#res').innerHTML=resBox(0,null,`<b>${esc(er.message)}</b>`)}}
+ if(!CAMON&&!REMOTE)$('#bc').focus()}};
+async function undo(id,btn){try{await post('/api/undo/'+id,{});btn.outerHTML='<span class="tag">geri alındı</span>';toast('Geri alındı','ok')}catch(e){toast(e.message,'err')}}
 
 V.out=async()=>{
-$('#main').innerHTML=`<div class="card"><h2>Stok Çıkışı (Outbound)</h2>
-<label>Sipariş no (diğer panelden)</label><input id="ref" value="${esc(S.ref)}" placeholder="Sipariş numarası">
-<label>Barkod okut (her okutma = 1 adet, EN YAKIN SKT'den düşer)</label><input id="bc" class="scan" autocomplete="off" placeholder="Barkodu okutun…">
-<div id="res"></div><h3>Bu sipariş / oturum</h3><table id="log"></table></div>`;
-(S.ref?$('#bc'):$('#ref')).focus();
-$('#ref').onkeydown=e=>{if(e.key=='Enter'){S.ref=e.target.value.trim();$('#bc').focus()}};
-$('#ref').onchange=e=>S.ref=e.target.value.trim();
+$('#main').innerHTML=head('Stok Çıkışı','Her okutma 1 adet düşer; stok SKT’si en yakın partiden çıkar.')+`<div class="card"><label>Sipariş no</label><div class="scanbox"><input id="ref" value="${esc(S.ref)}" placeholder="Sipariş numarası" style="font-size:18px">${camBtn('ref')}</div>
+<label>Ürün barkodu</label><div class="scanbox"><input id="bc" class="scan" autocomplete="off" placeholder="Okutun…">${camBtn('bc')}</div><div id="res"></div></div><div class="card"><h2>Bu oturum</h2><div class="tw"><table id="log"></table></div></div>`;
+if(!REMOTE)(S.ref?$('#bc'):$('#ref')).focus();
+$('#ref').onkeydown=e=>{if(e.key=='Enter'){S.ref=e.target.value.trim();if(CAMON)camStop();$('#bc').focus()}};$('#ref').onchange=e=>S.ref=e.target.value.trim();
 $('#bc').onkeydown=async e=>{if(e.key!='Enter')return;const bc=e.target.value.trim();if(!bc)return;e.target.value='';S.ref=$('#ref').value.trim();
- try{const r=await post('/api/outbound',{barcode:bc,ref:S.ref});beep(1);
-  $('#res').innerHTML=`<div class="msg ok">✔ ${esc(r.product)} – ${esc(r.sku)} (parti ${esc(r.lot||'-')}, SKT ${r.expiry||'-'}) · kalan stok: ${r.left}</div>`;
-  $('#log').insertAdjacentHTML('afterbegin',`<tr><td>${new Date().toLocaleTimeString()}</td><td>${esc(S.ref)}</td><td>${esc(r.product)} / ${esc(r.sku)}</td><td>${esc(r.lot||'')} ${r.expiry||''}</td><td><button class="d" onclick="undo(${r.movement_id},this)">Geri al</button></td></tr>`)}
- catch(er){beep(0);$('#res').innerHTML=`<div class="msg err">✖ ${esc(er.message)} (${esc(bc)})</div>`}
- $('#bc').focus()}};
+ if(!S.ref){beep(0);toast('Önce sipariş numarası girin','err');return}
+ try{const r=await post('/api/outbound',{barcode:bc,ref:S.ref});beep(1);toast(`${r.product} ✓`,'ok');
+  $('#res').innerHTML=resBox(1,r,`<b>${esc(r.product)}</b> · ${esc(r.sku)}<br>Parti ${esc(r.lot||'–')} · SKT ${r.expiry||'–'}<br>Kalan stok: <b>${r.left}</b>`);
+  $('#log').insertAdjacentHTML('afterbegin',`<tr><td>${new Date().toLocaleTimeString()}</td><td>${esc(S.ref)}</td><td>${esc(r.product)} / ${esc(r.sku)}</td><td>${esc(r.lot||'')} ${r.expiry||''}</td><td><button class="btn d sm" onclick="undo(${r.movement_id},this)">Geri al</button></td></tr>`)}
+ catch(er){beep(0);toast(er.message,'err',3500);$('#res').innerHTML=resBox(0,null,`<b>${esc(er.message)}</b><br>${esc(bc)}`)}
+ if(!CAMON&&!REMOTE)$('#bc').focus()}};
 
+/* ---------- Siparişe göre geri alma ---------- */
+V.ret=async()=>{const rec=await api('/api/orders/recent');
+$('#main').innerHTML=head('Sipariş Geri Al','Yanlış çıkışı siparişe göre bulup geri alın; stok aynı partiye geri döner.')+`<div class="card"><label>Sipariş no</label><div class="row"><div class="scanbox" style="flex:3"><input id="ro" value="${esc(S.retRef||'')}" placeholder="Sipariş numarası">${camBtn('ro')}</div><button class="btn fit" onclick="loadOrder()">Getir</button></div>
+<div class="chips" style="margin-top:10px">${rec.map(o=>`<span class="chip" data-ref="${esc(o.ref)}">${esc(o.ref)} · ${o.n}${o.undone?' ('+o.undone+' geri)':''}</span>`).join('')||'<span class="m">Henüz çıkış yok</span>'}</div></div><div id="ol"></div>`;
+$('.chips').onclick=e=>{if(e.target.dataset.ref){$('#ro').value=e.target.dataset.ref;loadOrder()}};
+$('#ro').onkeydown=e=>{if(e.key=='Enter'){if(CAMON)camStop();loadOrder()}};if(S.retRef)loadOrder()};
+async function loadOrder(){const ref=$('#ro').value.trim();if(!ref)return;S.retRef=ref;
+const m=await api(`/api/movements?type=out&ref=${encodeURIComponent(ref)}&exact=1&limit=1000`);
+if(!m.length){$('#ol').innerHTML=`<div class="card empty">Bu siparişe ait çıkış bulunamadı: <b>${esc(ref)}</b></div>`;return}
+const g={};m.forEach(x=>{const k=x.barcode;g[k]=g[k]||{n:x.pname,v:x.sname,bc:x.barcode,out:0,back:0};g[k].out++;if(x.undone)g[k].back++});
+const L=Object.values(g),rem=L.reduce((a,x)=>a+x.out-x.back,0);
+$('#ol').innerHTML=`<div class="card"><div class="row"><h2 style="flex:3;margin:0">Sipariş ${esc(ref)} <span class="tag">${m.length} çıkış</span> <span class="tag ${rem?'':'g'}">${m.length-rem} geri alındı</span></h2>${rem?`<button class="btn d fit" onclick="undoAll()">Tümünü geri al (${rem})</button>`:''}</div>
+<div class="tw"><table><tr><th>Ürün</th><th>Varyant</th><th>Barkod</th><th>Çıkış</th><th>Geri alınan</th><th></th></tr>${L.map(x=>`<tr><td>${esc(x.n)}</td><td>${esc(x.v)}</td><td>${esc(x.bc)}</td><td>${x.out}</td><td>${x.back}</td><td>${x.out-x.back?`<button class="btn s sm" onclick="undoOne('${esc(x.bc)}')">1 adet geri al</button>`:'<span class="tag g">tamam</span>'}</td></tr>`).join('')}</table></div>
+<label>Ya da geri alınacak ürünü okutun (her okutma 1 adet)</label><div class="scanbox"><input id="rb" class="scan" placeholder="Barkod…" autocomplete="off">${camBtn('rb')}</div></div>`;
+$('#rb').onkeydown=async e=>{if(e.key=='Enter'&&e.target.value.trim()){const b=e.target.value.trim();e.target.value='';await undoOne(b)}}}
+async function undoOne(bc){try{const r=await post('/api/order-undo',{ref:S.retRef,barcode:bc});beep(1);toast(`Geri alındı: ${r.product}`,'ok');await loadOrder()}catch(e){beep(0);toast(e.message,'err',3500)}}
+async function undoAll(){if(!confirm(`“${S.retRef}” siparişindeki tüm çıkışlar geri alınsın mı?`))return;const m=await api(`/api/movements?type=out&ref=${encodeURIComponent(S.retRef)}&exact=1&limit=1000`);let n=0;for(const x of m)if(!x.undone){try{await post('/api/undo/'+x.id,{});n++}catch(e){}}toast(n+' çıkış geri alındı','ok');loadOrder()}
+
+/* ---------- Panel (gelişmiş filtre) ---------- */
+let F=Object.assign({q:'',cat:'',brand:'',stock:'',skt:'',period:'14',from:'',to:''},JSON.parse(localStorage.F||'{}')),SORT={k:'name',d:1};
+V.dash=async()=>{
+const [pl,bl]=await Promise.all([api('/api/products'),api('/api/batches')]);window._pl=pl;window._bl=bl;
+$('#main').innerHTML=head('Panel','Filtreleri kullanarak stok, SKT ve hareketleri inceleyin.')+`<div class="filters"><div class="card" style="margin-bottom:12px"><div class="row">
+<div style="flex:2"><label>Ara</label><input id="fq" placeholder="Ürün, marka, barkod…" value="${esc(F.q)}"></div>
+<div><label>Kategori</label><select id="fc"><option value="">Tümü</option>${[...new Set(pl.map(p=>p.category).filter(Boolean))].sort().map(c=>`<option ${F.cat==c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+<div><label>Marka</label><select id="fb"><option value="">Tümü</option>${[...new Set(pl.map(p=>p.brand).filter(Boolean))].sort().map(c=>`<option ${F.brand==c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+<div><label>Dönem</label><select id="fp">${[['7','Son 7 gün'],['14','Son 14 gün'],['30','Son 30 gün'],['90','Son 90 gün'],['custom','Özel aralık']].map(([v,l])=>`<option value="${v}" ${F.period==v?'selected':''}>${l}</option>`).join('')}</select></div>
+<div class="${F.period=='custom'?'':'hide'}" id="fcu"><label>Başlangıç / Bitiş</label><div class="row"><input type="date" id="ff" value="${F.from}"><input type="date" id="ft" value="${F.to}"></div></div></div>
+<div class="row" style="margin-top:10px"><div><label>Stok durumu</label><div class="chips" id="cs">${[['','Tümü'],['low','Düşük stok'],['out','Stokta yok'],['ok','Yeterli']].map(([v,l])=>`<span class="chip ${F.stock==v?'on':''}" data-v="${v}">${l}</span>`).join('')}</div></div>
+<div><label>SKT</label><div class="chips" id="ck">${[['','Tümü'],['expired','Geçmiş'],['7','≤7 gün'],['30','≤30 gün'],['60','≤60 gün'],['90','≤90 gün']].map(([v,l])=>`<span class="chip ${F.skt==v?'on':''}" data-v="${v}">${l}</span>`).join('')}</div></div>
+<button class="btn s fit" onclick="clrF()">Filtreleri temizle</button></div></div></div><div id="dv"></div>`;
+const sv=()=>{F.q=$('#fq').value;F.cat=$('#fc').value;F.brand=$('#fb').value;F.period=$('#fp').value;F.from=$('#ff').value;F.to=$('#ft').value;localStorage.F=JSON.stringify(F);$('#fcu').classList.toggle('hide',F.period!='custom')};
+for(const i of['fq','fc','fb','fp','ff','ft'])$('#'+i).oninput=()=>{sv();drawDash()};
+for(const [id,key] of[['cs','stock'],['ck','skt']])$('#'+id).onclick=e=>{const v=e.target.dataset.v;if(v===undefined)return;F[key]=v;localStorage.F=JSON.stringify(F);[...$('#'+id).children].forEach(c=>c.classList.toggle('on',c.dataset.v==v));drawDash()};
+drawDash()};
+function clrF(){F={q:'',cat:'',brand:'',stock:'',skt:'',period:'14',from:'',to:''};localStorage.F=JSON.stringify(F);V.dash()}
+function period(){const e=new Date();let s=new Date();if(F.period=='custom'&&F.from){return [F.from,F.to||ymd(e)]}s.setDate(s.getDate()-(+F.period||14)+1);return [ymd(s),ymd(e)]}
+async function drawDash(){
+const [d1,d2]=period(),q=F.q.toLowerCase();
+const pl=window._pl.filter(p=>(!q||(p.name+' '+p.brand+' '+p.category+' '+p.skus.map(s=>s.barcode+' '+s.name).join(' ')).toLowerCase().includes(q))&&(!F.cat||p.category==F.cat)&&(!F.brand||p.brand==F.brand)&&(!F.stock||(F.stock=='out'?p.stock==0:F.stock=='low'?p.stock>0&&p.stock<=p.min_stock:p.stock>p.min_stock)));
+const ids=new Set(pl.map(p=>p.id));
+const bl=window._bl.filter(b=>ids.has(b.pid));
+const sktOk=b=>{if(!F.skt)return true;if(!b.expiry)return false;const d=dleft(b.expiry);return F.skt=='expired'?d<0:d>=0&&d<=+F.skt};
+const bf=bl.filter(sktOk);
+let mv=[];try{mv=(await api(`/api/movements?from=${d1}&to=${d2}&limit=50000`)).filter(m=>!m.undone&&ids.has(m.pid)&&(m.type=='in'||m.type=='out'))}catch(e){}
+const days=[];for(let d=new Date(d1+'T00:00:00');ymd(d)<=d2&&days.length<120;d.setDate(d.getDate()+1))days.push(ymd(d));
+const ins=days.map(()=>0),outs=days.map(()=>0),top={};let tin=0,tout=0;
+mv.forEach(m=>{const i=days.indexOf(m.ts.slice(0,10));if(i<0)return;if(m.type=='in'){ins[i]+=m.qty;tin+=m.qty}else{outs[i]+=m.qty;tout+=m.qty;top[m.pname]=(top[m.pname]||0)+m.qty}});
+const tops=Object.entries(top).sort((a,b)=>b[1]-a[1]).slice(0,8),tmax=tops[0]?tops[0][1]:1;
+const exp=bl.filter(b=>b.expiry&&dleft(b.expiry)<0).length,soon=bl.filter(b=>b.expiry&&dleft(b.expiry)>=0&&dleft(b.expiry)<=30).length;
+const nearest={};window._bl.forEach(b=>{if(b.expiry&&(!nearest[b.pid]||b.expiry<nearest[b.pid]))nearest[b.pid]=b.expiry});
+const low=pl.filter(p=>p.stock<=p.min_stock).length;
+const rows=pl.filter(p=>!F.skt||bf.some(b=>b.pid==p.id)).map(p=>({...p,near:nearest[p.id]||''}));
+const k=SORT.k;rows.sort((a,b)=>{let x=a[k],y=b[k];if(typeof x=='string'||typeof y=='string'){return(x||'').toString().localeCompare((y||'').toString(),'tr')*SORT.d}return((x||0)-(y||0))*SORT.d});
+const th=(key,l)=>`<th class="so" onclick="sortBy('${key}')">${l}${SORT.k==key?(SORT.d>0?' ▲':' ▼'):''}</th>`;
+$('#dv').innerHTML=`<div class="grid g4"><div class="kpi"><small>Ürün</small><b>${pl.length}</b></div><div class="kpi"><small>Toplam stok</small><b>${pl.reduce((a,p)=>a+p.stock,0)}</b></div>
+<div class="kpi ${exp?'bad':''}"><small>SKT’si geçmiş parti</small><b>${exp}</b></div><div class="kpi ${soon?'warn':''}"><small>30 gün içinde dolacak</small><b>${soon}</b></div>
+<div class="kpi ${low?'warn':''}"><small>Düşük / biten ürün</small><b>${low}</b></div><div class="kpi ok"><small>Dönem giriş</small><b>+${tin}</b></div><div class="kpi"><small>Dönem çıkış</small><b>−${tout}</b></div></div>
+<div class="grid g2" style="margin-top:16px"><div class="card"><h2>Günlük giriş / çıkış <span class="m" style="font-size:12px">(<span style="color:var(--ok)">■</span> giriş <span style="color:var(--acc)">■</span> çıkış)</span></h2>${chart(days,ins,outs)}</div>
+<div class="card"><h2>En çok çıkan ürünler</h2>${tops.map(([n,v])=>`<div style="margin:9px 0"><div class="row" style="gap:6px"><span style="flex:3">${esc(n)}</span><b class="fit">${v}</b></div><div class="bar" style="width:${v/tmax*100}%"></div></div>`).join('')||'<div class="empty">Bu dönemde çıkış yok</div>'}</div></div>
+${F.skt?`<div class="card"><h2>SKT filtresine uyan partiler (${bf.length})</h2><div class="tw">${batchTable(bf)}</div></div>`:''}
+<div class="card"><div class="row"><h2 style="flex:3">Ürün stok durumu (${rows.length})</h2><button class="btn s sm fit" onclick="dlView()">CSV indir</button></div><div class="tw"><table><tr>${th('name','Ürün')}${th('category','Kategori')}${th('brand','Marka')}${th('stock','Stok')}${th('min_stock','Min')}${th('near','En yakın SKT')}</tr>
+${rows.map(p=>`<tr class="cl" onclick="editProd(${p.id})"><td>${esc(p.name)}</td><td>${esc(p.category||'')}</td><td>${esc(p.brand||'')}</td><td><span class="tag ${p.stock==0?'r':p.stock<=p.min_stock?'o':'g'}">${p.stock}</span></td><td>${p.min_stock}</td><td>${fmtExp(p.near)}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">Filtreye uyan ürün yok</td></tr>'}</table></div></div>`;
+window._rows=rows}
+function sortBy(k){SORT.d=SORT.k==k?-SORT.d:1;SORT.k=k;drawDash()}
+function dlView(){const r=window._rows,e2=v=>`"${String(v??'').replace(/"/g,'""')}"`;const t='\ufeff'+['Ürün;Kategori;Marka;Stok;Min;En yakın SKT',...r.map(p=>[p.name,p.category,p.brand,p.stock,p.min_stock,p.near].map(e2).join(';'))].join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));a.download='panel-gorunumu.csv';a.click()}
+function chart(days,ins,outs){const W=Math.max(days.length*24,320),H=150,mx=Math.max(1,...ins,...outs),bw=W/days.length,st=Math.ceil(days.length/12);let s=`<svg viewBox="0 0 ${W} ${H+22}" style="width:100%;height:190px">`;
+days.forEach((d,i)=>{const hi=ins[i]/mx*H,ho=outs[i]/mx*H,x=i*bw;s+=`<rect x="${x+bw*.1}" y="${H-hi}" width="${bw*.38}" height="${hi}" rx="2" fill="var(--ok)"><title>${d} giriş ${ins[i]}</title></rect><rect x="${x+bw*.52}" y="${H-ho}" width="${bw*.38}" height="${ho}" rx="2" fill="var(--acc)"><title>${d} çıkış ${outs[i]}</title></rect>`;if(i%st==0)s+=`<text x="${x+bw/2}" y="${H+15}" font-size="9" text-anchor="middle" fill="var(--muted)">${d.slice(5)}</text>`});return s+'</svg>'}
+const batchTable=a=>`<table><tr><th>Ürün</th><th>Varyant</th><th>Barkod</th><th>Parti</th><th>SKT</th><th>Adet</th><th></th></tr>${a.map(b=>`<tr><td>${esc(b.pname)}</td><td>${esc(b.sname)}</td><td>${esc(b.barcode)}</td><td>${esc(b.lot||'')}</td><td>${fmtExp(b.expiry)}</td><td>${b.qty}</td><td><button class="btn s sm" onclick="adjDlg(${b.id},${b.qty},this.dataset.n)" data-n="${esc(b.pname)}">Düzelt</button></td></tr>`).join('')||'<tr><td colspan=7 class="empty">Kayıt yok</td></tr>'}</table>`;
+
+/* ---------- Ürünler ---------- */
 let PL=[];
 V.prod=async()=>{PL=await api('/api/products');
-$('#main').innerHTML=`<div class="card"><div class="row"><input id="q" placeholder="Ara: ürün, marka, barkod…" style="flex:3"><button class="p" onclick="editProd()">+ Yeni ürün</button><button class="s" onclick="impDlg()">CSV içe aktar</button></div><div id="pl"></div></div>`;
+$('#main').innerHTML=head('Ürünler',`${PL.length} ürün`)+`<div class="card"><div class="row"><div style="flex:3"><input id="q" placeholder="Ara: ürün, marka, barkod…"></div><button class="btn fit" onclick="editProd()">+ Yeni</button><button class="btn s fit" onclick="camNew()" title="Kamerayla ekle">${ic('cam')}</button></div>
+<div class="row" style="margin-top:10px"><button class="btn s sm fit" onclick="impDlg()">CSV içe aktar</button><a class="btn s sm fit" style="text-decoration:none;padding:6px 11px" href="/api/export/urunler.csv">CSV dışa aktar</a></div><div id="pl" class="plist" style="margin-top:8px"></div></div>`;
 $('#q').oninput=rp;rp()};
-function rp(){const q=$('#q').value.toLowerCase();$('#pl').innerHTML=`<table><tr><th></th><th>Ürün</th><th>Marka</th><th>Varyantlar</th><th>Stok</th><th></th></tr>`+PL.filter(p=>!q||(p.name+p.brand+p.category+p.skus.map(s=>s.barcode+s.name).join(' ')).toLowerCase().includes(q)).map(p=>`<tr><td>${p.image?`<img class="thumb" src="/img/${p.image}">`:''}</td><td><b>${esc(p.name)}</b><br><span class="m">${esc(p.category||'')}</span></td><td>${esc(p.brand||'')}</td><td>${p.skus.map(s=>`${esc(s.name)} <span class="m">${esc(s.barcode)}${s.weight_g?' · '+s.weight_g+' g':''}</span>`).join('<br>')}</td><td><span class="tag ${p.stock<=p.min_stock?'r':'g'}">${p.stock}</span></td><td><button class="s" onclick="editProd(${p.id})">Düzenle</button></td></tr>`).join('')+'</table>'}
+function rp(){const q=$('#q').value.toLowerCase();$('#pl').innerHTML=PL.filter(p=>!q||(p.name+' '+p.brand+' '+p.category+' '+p.skus.map(s=>s.barcode+' '+s.name).join(' ')).toLowerCase().includes(q)).map(p=>`<div class="pr" onclick="editProd(${p.id})">${p.image?`<img class="thumb" src="/img/${p.image}">`:'<div class="thumb"></div>'}<div class="nm"><div><b>${esc(p.name)}</b> <span class="m">${esc(p.brand||'')}</span></div><div class="m" style="font-size:13px">${esc(p.category||'')} · ${p.skus.map(s=>esc(s.name)+' '+esc(s.barcode)+(s.weight_g?' · '+s.weight_g+'g':'')).join(' | ')}</div></div><span class="tag ${p.stock==0?'r':p.stock<=p.min_stock?'o':'g'}">${p.stock}</span></div>`).join('')||'<div class="empty">Ürün yok</div>'}
+function camNew(){camScan(async code=>{await camStop();PL=await api('/api/products');const p=PL.find(p=>p.skus.some(x=>x.barcode==code));if(p){toast('Bu barkod kayıtlı: '+p.name,'info');editProd(p.id)}else editProd(null,code)},'Eklenecek ürünün barkodu')}
 function fieldInputs(scope,attrs,pre){return fields.filter(f=>f.scope==scope).map(f=>`<div><label>${esc(f.name)}</label><input data-f="${pre}" data-n="${esc(f.name)}" value="${esc((attrs||{})[f.name]||'')}"></div>`).join('')}
-function skuHtml(s={}){return `<div class="var" data-id="${s.id||''}"><div class="row"><div><label>Varyant adı</label><input class="sn" value="${esc(s.name||'Standart')}"></div><div><label>Barkod</label><input class="sb" value="${esc(s.barcode||'')}"></div><div><label>Gramaj (g)</label><input class="sw" type="number" step="any" value="${s.weight_g??''}"></div></div><div class="row">${fieldInputs('sku',s.attrs,'s')}</div></div>`}
-async function editProd(id,bc){fields=await api('/api/fields');const p=id?PL.find(x=>x.id==id)||(await api('/api/products')).find(x=>x.id==id):{skus:[{barcode:bc||''}],track_expiry:1,unit:'adet',min_stock:0,attrs:{}};
-$('#mbody').innerHTML=`<h2>${id?'Ürünü düzenle':'Yeni ürün'}</h2>
-<div class="row"><div style="flex:2"><label>Ürün adı *</label><input id="pn" value="${esc(p.name||'')}"></div><div><label>Marka</label><input id="pb" value="${esc(p.brand||'')}"></div><div><label>Kategori</label><input id="pc" value="${esc(p.category||'')}"></div></div>
-<div class="row"><div><label>Birim</label><input id="pu" value="${esc(p.unit||'adet')}"></div><div><label>Minimum stok uyarısı</label><input id="pm" type="number" value="${p.min_stock||0}"></div><div><label>SKT takibi</label><select id="pt"><option value="1" ${p.track_expiry?'selected':''}>Var (giriş SKT zorunlu)</option><option value="0" ${!p.track_expiry?'selected':''}>Yok</option></select></div></div>
-<div class="row">${fieldInputs('product',p.attrs,'p')}</div>
-<label>Not</label><textarea id="pno" rows="2">${esc(p.notes||'')}</textarea>
-<label>Görsel</label>${p.image?`<img class="pv" id="pv" src="/img/${p.image}">`:'<img class="pv hide" id="pv">'}<input type="file" id="pi" accept="image/*">
-<h3>Varyantlar & barkodlar</h3><div id="sk">${p.skus.map(skuHtml).join('')}</div><button class="s" onclick="$('#sk').insertAdjacentHTML('beforeend',skuHtml())">+ Varyant ekle</button>
-<div id="perr"></div><div class="row" style="margin-top:14px"><button class="p" onclick="saveProd(${id||0})">Kaydet</button><button class="s" onclick="closeM()">İptal</button>${id?`<button class="d" onclick="delProd(${id})">Sil</button>`:''}</div>`;
-$('#modal').classList.add('show');$('#pi').onchange=e=>{const f=e.target.files[0];if(f){$('#pv').src=URL.createObjectURL(f);$('#pv').classList.remove('hide')}};
-setTimeout(()=>(bc?$('#pn'):$('#pn')).focus(),50)}
-const closeM=()=>$('#modal').classList.remove('show');
+let VC=0;function skuHtml(s={}){const id='sb'+(VC++);return `<div class="var" data-id="${s.id||''}"><div class="row"><div><label>Varyant adı</label><input class="sn" value="${esc(s.name||'Standart')}"></div><div style="flex:2"><label>Barkod</label><div class="scanbox"><input class="sb" id="${id}" value="${esc(s.barcode||'')}"><button class="cambtn" type="button" style="padding:0 12px" onclick="camFor('${id}',false)">${ic('cam')}</button></div></div><div><label>Gramaj (g)</label><input class="sw" type="number" step="any" value="${s.weight_g??''}"></div></div><div class="row">${fieldInputs('sku',s.attrs,'s')}</div></div>`}
+async function editProd(id,bc){fields=await api('/api/fields');if(!PL.length||(id&&!PL.find(x=>x.id==id)))PL=await api('/api/products');
+const p=id?PL.find(x=>x.id==id):{skus:[{barcode:bc||''}],track_expiry:1,unit:'adet',min_stock:0,attrs:{}};
+$('#mbody').innerHTML=`<h2>${id?'Ürünü düzenle':'Yeni ürün'}</h2><div class="row"><div style="flex:2"><label>Ürün adı *</label><input id="pn" value="${esc(p.name||'')}"></div><div><label>Marka</label><input id="pb" value="${esc(p.brand||'')}"></div><div><label>Kategori</label><input id="pc" value="${esc(p.category||'')}"></div></div>
+<div class="row"><div><label>Birim</label><input id="pu" value="${esc(p.unit||'adet')}"></div><div><label>Minimum stok uyarısı</label><input id="pm" type="number" value="${p.min_stock||0}"></div><div><label>SKT takibi</label><select id="pt"><option value="1" ${p.track_expiry?'selected':''}>Var (girişte SKT zorunlu)</option><option value="0" ${!p.track_expiry?'selected':''}>Yok</option></select></div></div>
+<div class="row">${fieldInputs('product',p.attrs,'p')}</div><label>Not</label><textarea id="pno" rows="2">${esc(p.notes||'')}</textarea>
+<label>Görsel (telefondan fotoğraf çekebilirsiniz)</label><div class="row" style="align-items:center">${p.image?`<img class="thumb big" id="pv" src="/img/${p.image}">`:'<img class="thumb big hide" id="pv">'}<input type="file" id="pi" accept="image/*"></div>
+<h3>Varyantlar & barkodlar</h3><div id="sk">${p.skus.map(skuHtml).join('')}</div><button class="btn s sm" onclick="$('#sk').insertAdjacentHTML('beforeend',skuHtml())">+ Varyant ekle</button>
+<div id="perr"></div><div class="row" style="margin-top:16px"><button class="btn" onclick="saveProd(${id||0})">Kaydet</button><button class="btn s" onclick="closeM()">İptal</button>${id?`<button class="btn d" onclick="delProd(${id})">Sil</button>`:''}</div>`;
+$('#modal').classList.add('show');$('#pi').onchange=e=>{const f=e.target.files[0];if(f){$('#pv').src=URL.createObjectURL(f);$('#pv').classList.remove('hide')}};setTimeout(()=>$('#pn').focus(),60)}
 const attrsOf=(root,k)=>{const o={};root.querySelectorAll(`[data-f=${k}]`).forEach(i=>{if(i.value)o[i.dataset.n]=i.value});return o};
+async function shrink(f){try{if(!f.type.startsWith('image/'))return f;const b=await createImageBitmap(f),k=Math.min(1,1000/Math.max(b.width,b.height)),cv=document.createElement('canvas');cv.width=Math.round(b.width*k);cv.height=Math.round(b.height*k);cv.getContext('2d').drawImage(b,0,0,cv.width,cv.height);return await new Promise(r=>cv.toBlob(r,'image/jpeg',.85))}catch(e){return f}}
 async function saveProd(id){const body={name:$('#pn').value,brand:$('#pb').value,category:$('#pc').value,unit:$('#pu').value,min_stock:$('#pm').value,track_expiry:$('#pt').value=='1',notes:$('#pno').value,attrs:attrsOf($('#mbody'),'p'),
  skus:[...document.querySelectorAll('.var')].map(v=>({id:v.dataset.id?+v.dataset.id:undefined,name:v.querySelector('.sn').value,barcode:v.querySelector('.sb').value,weight_g:v.querySelector('.sw').value,attrs:attrsOf(v,'s')})).filter(s=>s.barcode||s.id)};
  try{let pid=id;if(id)await api('/api/products/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});else pid=(await post('/api/products',body)).id;
-  const f=$('#pi').files[0];if(f)await api(`/api/products/${pid}/image`,{method:'POST',headers:{'Content-Type':f.type||'image/jpeg'},body:f});
-  closeM();go(tab)}catch(e){$('#perr').innerHTML=`<div class="msg err">${esc(e.message)}</div>`}}
-async function delProd(id){if(confirm('Bu ürün listeden kaldırılsın mı? (hareket geçmişi korunur)')){await api('/api/products/'+id,{method:'DELETE'});closeM();go('prod')}}
-function impDlg(){$('#mbody').innerHTML=`<h2>CSV içe aktar</h2><p class="m">Başlıklar: <code>urun;marka;kategori;varyant;barkod;gramaj</code> (noktalı virgül veya virgül). Aynı ürün adı tekrarlanırsa varyant olarak eklenir. Mevcut barkodlar atlanır.</p><input type="file" id="cf" accept=".csv,text/csv"><div id="ir"></div><div class="row" style="margin-top:12px"><button class="p" onclick="doImp()">İçe aktar</button><button class="s" onclick="closeM()">Kapat</button></div>`;$('#modal').classList.add('show')}
-async function doImp(){const f=$('#cf').files[0];if(!f)return;try{const r=await api('/api/import',{method:'POST',headers:{'Content-Type':'text/plain'},body:await f.text()});$('#ir').innerHTML=`<div class="msg ok">${r.imported} varyant eklendi</div>`;PL=await api('/api/products')}catch(e){$('#ir').innerHTML=`<div class="msg err">${esc(e.message)}</div>`}}
+  const f=$('#pi').files[0];if(f){const b=await shrink(f);await api(`/api/products/${pid}/image`,{method:'POST',headers:{'Content-Type':b.type||'image/jpeg'},body:b})}
+  closeM();toast('Kaydedildi','ok');go(tab)}catch(e){$('#perr').innerHTML=`<div class="res err"><div>${esc(e.message)}</div></div>`}}
+async function delProd(id){if(confirm('Bu ürün listeden kaldırılsın mı? (hareket geçmişi korunur)')){await api('/api/products/'+id,{method:'DELETE'});closeM();go(tab)}}
+function impDlg(){$('#mbody').innerHTML=`<h2>CSV içe aktar</h2><p class="m">Başlıklar: <code>urun;marka;kategori;varyant;barkod;gramaj;birim;min_stok;skt_takibi;notlar</code> + isteğe bağlı <code>urun_ozel:ALAN</code> / <code>varyant_ozel:ALAN</code>. “Dışa aktar” dosyası aynı biçimdedir. Mevcut barkodlar atlanır, aynı ürün adı varyant olarak eklenir.</p><input type="file" id="cf" accept=".csv,text/csv"><div id="ir"></div><div class="row" style="margin-top:14px"><button class="btn" onclick="doImp()">İçe aktar</button><button class="btn s" onclick="closeM()">Kapat</button></div>`;$('#modal').classList.add('show')}
+async function doImp(){const f=$('#cf').files[0];if(!f)return;try{const r=await api('/api/import',{method:'POST',headers:{'Content-Type':'text/plain'},body:await f.text()});$('#ir').innerHTML=`<div class="res ok"><div><b>${r.imported}</b> varyant eklendi, ${r.skipped} mevcut barkod atlandı.${r.errors.length?'<br><span style="color:var(--bad)">'+r.errors.slice(0,8).map(esc).join('<br>')+'</span>':''}</div></div>`;PL=await api('/api/products');rp()}catch(e){$('#ir').innerHTML=`<div class="res err"><div>${esc(e.message)}</div></div>`}}
 
-V.batch=async()=>{$('#main').innerHTML=`<div class="card"><h2>Partiler (SKT sırasıyla)</h2>${bt(await api('/api/batches'))}<p><a href="/api/export/stok.csv">⬇ Stok CSV</a></p></div>`};
-V.mov=async()=>{$('#main').innerHTML=`<div class="card"><h2>Hareketler</h2><div class="row"><select id="ft"><option value="">Tümü</option><option value="in">Giriş</option><option value="out">Çıkış</option><option value="undo">Geri alma</option><option value="adj">Düzeltme/Sayım/İmha</option></select><input id="fr" placeholder="Sipariş no ara"></div><div id="ml"></div><p><a href="/api/export/hareketler.csv">⬇ Hareketler CSV</a></p></div>`;
-const load=async()=>{const m=await api(`/api/movements?type=${$('#ft').value}&ref=${encodeURIComponent($('#fr').value)}`);$('#ml').innerHTML=`<table><tr><th>Zaman</th><th>Tip</th><th>Ürün</th><th>Parti/SKT</th><th>Adet</th><th>Sipariş</th></tr>${m.map(x=>`<tr style="${x.undone?'opacity:.45;text-decoration:line-through':''}"><td>${x.ts}</td><td>${{in:'Giriş',out:'Çıkış',undo:'Geri alma',adj:'Düzeltme'}[x.type]}</td><td>${esc(x.pname)} / ${esc(x.sname)}</td><td>${esc(x.lot||'')} ${x.expiry||''}</td><td>${x.qty}</td><td>${x.type=='adj'?esc(x.ref+': '+(x.note||'')):esc(x.ref||x.note||'')}</td></tr>`).join('')}</table>`};
-$('#ft').onchange=load;$('#fr').oninput=load;load()};
-V.set=async()=>{$('#main').innerHTML=`<div class="card"><h2>Özel alanlar</h2><p class="m">Ürün, varyant veya parti için kendi özelliklerinizi ekleyin (ör. Menşei, Raf ömrü, Alerjen). Ürün/varyant ekranında görünür.</p>
-<table>${fields.map(f=>`<tr><td>${{product:'Ürün',sku:'Varyant'}[f.scope]}</td><td>${esc(f.name)}</td><td><button class="d" onclick="delF(${f.id})">Sil</button></td></tr>`).join('')}</table>
-<div class="row" style="margin-top:10px"><select id="fs"><option value="product">Ürün alanı</option><option value="sku">Varyant alanı</option></select><input id="fn" placeholder="Alan adı"><button class="p" onclick="addF()">Ekle</button></div></div>
-<div class="card" id="bk"></div>`;bkLoad()};
-function adjDlg(id,q,n){$('#mbody').innerHTML=`<h2>Parti düzeltme: ${n}</h2><p class="m">Mevcut: ${q}. Sayım farkı, fire veya imha için yeni adedi girin. Kayıt hareketlere işlenir.</p><label>Yeni adet</label><input id="aq" type="number" min="0" value="${q}"><label>Tür</label><select id="ak"><option value="sayim">Sayım düzeltme</option><option value="imha">İmha / SKT geçti</option><option value="fire">Fire / hasar</option></select><label>Gerekçe *</label><input id="ar"><div id="aerr"></div><div class="row" style="margin-top:12px"><button class="p" onclick="doAdj(${id})">Kaydet</button><button class="s" onclick="closeM()">İptal</button></div>`;$('#modal').classList.add('show')}
-async function doAdj(id){try{await post('/api/adjust',{batch_id:id,new_qty:$('#aq').value,kind:$('#ak').value,reason:$('#ar').value});closeM();go(tab)}catch(e){$('#aerr').innerHTML=`<div class="msg err">${esc(e.message)}</div>`}}
-async function bkLoad(){const b=await api('/api/backup/list');
-$('#bk').innerHTML=`<h2>Yedekleme</h2><p>Otomatik: açılışta, kapanışta ve değişiklik olduktan en geç ~2 dk sonra. Son yedek: <b>${b.last||'bu oturumda henüz yok'}</b></p>
-<p class="m">Veri klasörü: <code>${esc(b.data_dir)}</code> (yedekler <code>yedekler/</code> içinde). Son 50 yedek + son 90 günün her günü saklanır.</p>
-<label>Ek yedek klasörü (iCloud Drive / Google Drive / Dropbox / harici disk içinde bir klasör) — her yedek buraya da kopyalanır</label>
-<div class="row"><input id="md" value="${esc(b.mirror_dir)}" placeholder="/Users/siz/Google Drive/StokYedek  veya  D:\\StokYedek" style="flex:3"><button class="p" onclick="saveMd()">Kaydet</button></div>
-${b.mirror_err?`<div class="msg err">Ek klasöre kopyalanamadı: ${esc(b.mirror_err)}</div>`:''}
-<div class="row" style="margin:12px 0"><button class="p" onclick="bkNow()">Şimdi yedek al</button><button class="s" onclick="$('#rf').click()">Yedekten geri yükle (zip seç)</button><input type="file" id="rf" accept=".zip" class="hide" onchange="bkRestoreFile(this.files[0])"></div>
-<table><tr><th>Yedek</th><th>Boyut</th><th></th></tr>${b.files.slice(0,30).map(f=>`<tr><td>${esc(f.name)}</td><td>${f.kb} KB</td><td><a href="/api/backup/download?name=${encodeURIComponent(f.name)}">indir</a> · <a href="#" onclick="bkRestoreLocal('${esc(f.name)}');return false">geri yükle</a></td></tr>`).join('')}</table>`}
-async function saveMd(){try{await post('/api/backup/config',{mirror_dir:$('#md').value});bkLoad()}catch(e){alert(e.message)}}
-async function bkNow(){await post('/api/backup/now',{});bkLoad()}
-async function bkRestoreLocal(n){if(confirm('Mevcut veriler bu yedekle DEĞİŞTİRİLECEK (öncesinde otomatik yedek alınır). Devam?')){try{await post('/api/backup/restore-local',{name:n});alert('Geri yüklendi');go('dash')}catch(e){alert(e.message)}}}
-async function bkRestoreFile(f){if(f&&confirm('Mevcut veriler bu yedekle DEĞİŞTİRİLECEK (öncesinde otomatik yedek alınır). Devam?')){try{await api('/api/backup/restore',{method:'POST',headers:{'Content-Type':'application/zip'},body:f});alert('Geri yüklendi');go('dash')}catch(e){alert(e.message)}}}
+/* ---------- Partiler / Hareketler ---------- */
+V.batch=async()=>{const b=await api('/api/batches');$('#main').innerHTML=head('Partiler / SKT','SKT sırasıyla')+`<div class="card"><div class="row"><div style="flex:2"><input id="bq" placeholder="Ürün veya barkod ara…"></div><div class="chips" id="bk">${[['','Tümü'],['expired','Geçmiş'],['30','≤30 gün'],['90','≤90 gün']].map(([v,l],i)=>`<span class="chip ${i?'':'on'}" data-v="${v}">${l}</span>`).join('')}</div><a class="btn s sm fit" style="text-decoration:none;padding:6px 11px" href="/api/export/stok.csv">Stok CSV</a></div><div class="tw" id="bt" style="margin-top:10px"></div></div>`;
+let sk='';const draw=()=>{const q=$('#bq').value.toLowerCase();$('#bt').innerHTML=batchTable(b.filter(x=>(!q||(x.pname+x.barcode+x.sname).toLowerCase().includes(q))&&(!sk||(x.expiry&&(sk=='expired'?dleft(x.expiry)<0:dleft(x.expiry)>=0&&dleft(x.expiry)<=+sk)))))};
+$('#bq').oninput=draw;$('#bk').onclick=e=>{if(e.target.dataset.v===undefined)return;sk=e.target.dataset.v;[...$('#bk').children].forEach(c=>c.classList.toggle('on',c==e.target));draw()};draw()};
+V.mov=async()=>{$('#main').innerHTML=head('Hareketler')+`<div class="card"><div class="row"><div><label>Tür</label><select id="ft"><option value="">Tümü</option><option value="in">Giriş</option><option value="out">Çıkış</option><option value="undo">Geri alma</option><option value="adj">Düzeltme/İmha</option></select></div><div><label>Sipariş no</label><input id="fr"></div><div><label>Başlangıç</label><input type="date" id="fd1"></div><div><label>Bitiş</label><input type="date" id="fd2"></div></div><div class="tw" id="ml" style="margin-top:10px"></div><p><a href="/api/export/hareketler.csv">⬇ Hareketler CSV</a></p></div>`;
+const load=async()=>{const m=await api(`/api/movements?type=${$('#ft').value}&ref=${encodeURIComponent($('#fr').value)}&from=${$('#fd1').value}&to=${$('#fd2').value}&limit=500`);$('#ml').innerHTML=`<table><tr><th>Zaman</th><th>Tür</th><th>Ürün</th><th>Parti/SKT</th><th>Adet</th><th>Sipariş / not</th></tr>${m.map(x=>`<tr style="${x.undone?'opacity:.45;text-decoration:line-through':''}"><td>${x.ts}</td><td><span class="tag ${x.type=='in'?'g':x.type=='out'?'':'o'}">${{in:'Giriş',out:'Çıkış',undo:'Geri alma',adj:'Düzeltme'}[x.type]}</span></td><td>${esc(x.pname)} / ${esc(x.sname)}</td><td>${esc(x.lot||'')} ${x.expiry||''}</td><td>${x.qty}</td><td>${x.type=='adj'?esc(x.ref+': '+(x.note||'')):esc(x.ref||x.note||'')}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">Kayıt yok</td></tr>'}</table>`};
+for(const i of['ft','fr','fd1','fd2'])$('#'+i).oninput=load;load()};
+function adjDlg(id,q,n){$('#mbody').innerHTML=`<h2>Parti düzeltme: ${esc(n)}</h2><p class="m">Mevcut: ${q}. Sayım farkı, fire veya imha için yeni adedi girin.</p><label>Yeni adet</label><input id="aq" type="number" min="0" value="${q}"><label>Tür</label><select id="ak"><option value="sayim">Sayım düzeltme</option><option value="imha">İmha / SKT geçti</option><option value="fire">Fire / hasar</option></select><label>Gerekçe *</label><input id="ar"><div id="aerr"></div><div class="row" style="margin-top:14px"><button class="btn" onclick="doAdj(${id})">Kaydet</button><button class="btn s" onclick="closeM()">İptal</button></div>`;$('#modal').classList.add('show')}
+async function doAdj(id){try{await post('/api/adjust',{batch_id:id,new_qty:$('#aq').value,kind:$('#ak').value,reason:$('#ar').value});closeM();toast('Düzeltildi','ok');go(tab)}catch(e){$('#aerr').innerHTML=`<div class="res err"><div>${esc(e.message)}</div></div>`}}
+
+/* ---------- Ayarlar ---------- */
+V.set=async()=>{$('#main').innerHTML=head('Ayarlar')+`<div class="card"><h2>Özel alanlar</h2><p class="m">Ürün veya varyant için kendi özelliklerinizi ekleyin (Menşei, Alerjen…).</p><table>${fields.map(f=>`<tr><td>${{product:'Ürün',sku:'Varyant'}[f.scope]}</td><td>${esc(f.name)}</td><td><button class="btn d sm" onclick="delF(${f.id})">Sil</button></td></tr>`).join('')}</table>
+<div class="row" style="margin-top:10px"><select id="fs"><option value="product">Ürün alanı</option><option value="sku">Varyant alanı</option></select><input id="fn" placeholder="Alan adı"><button class="btn fit" onclick="addF()">Ekle</button></div></div>
+${REMOTE?'<div class="card m">Telefon/ağ ve yedekleme ayarları yalnızca bilgisayardan yönetilir.</div>':'<div class="card" id="lan"></div><div class="card" id="bk"></div>'}`;
+if(!REMOTE){lanLoad();bkLoad()}};
 async function addF(){if(!$('#fn').value.trim())return;await post('/api/fields',{scope:$('#fs').value,name:$('#fn').value});go('set')}
 async function delF(id){await api('/api/fields/'+id,{method:'DELETE'});go('set')}
-document.addEventListener('keydown',e=>{if(e.key=='Escape')closeM()});
+async function lanLoad(){await loadScript('/static/qrcode.js');const l=await api('/api/lan');
+ const qr=l.urls[0]?(()=>{const q=qrcode(0,'M');q.addData(l.urls[0]);q.make();return q.createSvgTag(5,2)})():'';
+ $('#lan').innerHTML=`<h2>Telefon / ağ modu</h2><p class="m">Telefonunuz bu bilgisayara <b>aynı Wi-Fi veya hotspot</b> üzerinden bağlanıp barkod okutabilir. Bilgisayar açık ve uygulama çalışır durumda olmalı. Dış sunucu yoktur, veri yalnızca bu bilgisayarda kalır.</p>
+ <div class="row"><div><label>${l.has_pin?'PIN’i değiştir (en az 6 karakter)':'PIN belirleyin (en az 6 karakter) *'}</label><input id="lp" type="password" autocomplete="new-password" placeholder="${l.has_pin?'değiştirmek için yazın':'PIN'}"></div><button class="btn fit" onclick="lanSet(${!l.enabled})">${l.enabled?'Ağ modunu kapat':'Ağ modunu aç'}</button>${l.has_pin&&l.enabled?'<button class="btn s fit" onclick="lanSet(true,true)">PIN’i kaydet</button>':''}</div>
+ ${l.err?`<div class="res err"><div>${esc(l.err)}</div></div>`:''}
+ ${l.enabled?`<div class="row" style="margin-top:14px;align-items:center"><div class="fit"><div class="qr">${qr}</div></div><div><b>Telefonda şu adresi açın (veya QR’ı okutun):</b><br>${l.urls.map(u=>`<code style="font-size:16px">${esc(u)}</code>`).join('<br>')||'IP bulunamadı, Wi-Fi bağlantısını kontrol edin'}<p class="m" style="font-size:13px">İlk açılışta tarayıcı <b>“Bağlantı gizli değil / güvenli değil”</b> uyarısı verir: <b>Gelişmiş → Yine de devam et</b> deyin. Sertifika bu bilgisayarda üretilir; bu uyarı normaldir ve kamera için gereklidir. Sonra PIN’i girin. Hotspot IP’si değişirse bu ekrandaki yeni adresi kullanın. Aktif telefon oturumu: ${l.sessions}</p></div></div>`:''}`}
+async function lanSet(en,keep){try{const b={};if($('#lp').value)b.pin=$('#lp').value;b.enabled=keep?true:en;await post('/api/lan',b);toast(b.enabled?'Ağ modu açık':'Ağ modu kapalı','ok');lanLoad()}catch(e){toast(e.message,'err',3500)}}
+async function bkLoad(){const b=await api('/api/backup/list');
+$('#bk').innerHTML=`<h2>Yedekleme</h2><p>Otomatik: açılışta, kapanışta ve değişiklikten sonra en geç ~2 dk içinde. Son yedek: <b>${b.last||'bu oturumda henüz yok'}</b></p>
+<p class="m">Veri klasörü: <code>${esc(b.data_dir)}</code>. Son 50 yedek + son 90 günün her günü saklanır.</p>
+<label>Ek yedek klasörü (iCloud / Google Drive / Dropbox / harici disk) — her yedek buraya da kopyalanır</label>
+<div class="row"><input id="md" value="${esc(b.mirror_dir)}" placeholder="/Users/siz/Google Drive/StokYedek  veya  D:\\StokYedek" style="flex:3"><button class="btn fit" onclick="saveMd()">Kaydet</button></div>
+${b.mirror_err?`<div class="res err"><div>Ek klasöre kopyalanamadı: ${esc(b.mirror_err)}</div></div>`:''}
+<div class="row" style="margin:14px 0"><button class="btn" onclick="bkNow()">Şimdi yedek al</button><button class="btn s" onclick="$('#rf').click()">Yedekten geri yükle (zip)</button><input type="file" id="rf" accept=".zip" class="hide" onchange="bkRestoreFile(this.files[0])"></div>
+<div class="tw"><table><tr><th>Yedek</th><th>Boyut</th><th></th></tr>${b.files.slice(0,30).map(f=>`<tr><td>${esc(f.name)}</td><td>${f.kb} KB</td><td><a href="/api/backup/download?name=${encodeURIComponent(f.name)}">indir</a> · <a href="#" onclick="bkRestoreLocal('${esc(f.name)}');return false">geri yükle</a></td></tr>`).join('')}</table></div>`}
+async function saveMd(){try{await post('/api/backup/config',{mirror_dir:$('#md').value});toast('Kaydedildi','ok');bkLoad()}catch(e){toast(e.message,'err')}}
+async function bkNow(){await post('/api/backup/now',{});toast('Yedek alındı','ok');bkLoad()}
+async function bkRestoreLocal(n){if(confirm('Mevcut veriler bu yedekle DEĞİŞTİRİLECEK (öncesinde otomatik yedek alınır). Devam?')){try{await post('/api/backup/restore-local',{name:n});toast('Geri yüklendi','ok');go('dash')}catch(e){toast(e.message,'err')}}}
+async function bkRestoreFile(f){if(f&&confirm('Mevcut veriler bu yedekle DEĞİŞTİRİLECEK (öncesinde otomatik yedek alınır). Devam?')){try{await api('/api/backup/restore',{method:'POST',headers:{'Content-Type':'application/zip'},body:f});toast('Geri yüklendi','ok');go('dash')}catch(e){toast(e.message,'err')}}}
+document.addEventListener('keydown',e=>{if(e.key=='Escape'){closeM();if(CAMON)camStop()}});
 go(tab);
 </script></body></html>

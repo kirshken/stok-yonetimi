@@ -14,8 +14,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
-      - run: pip install pyinstaller
-      - run: pyinstaller --noconfirm --onefile --name StokYonetimi --add-data "index.html${{ matrix.sep }}." app.py
+      - run: pip install pyinstaller cryptography
+      - run: pyinstaller --noconfirm --onefile --name StokYonetimi --add-data "index.html${{ matrix.sep }}." --add-data "static${{ matrix.sep }}static" --hidden-import cryptography app.py
       - if: runner.os == 'Windows'
         run: Compress-Archive -Path dist/StokYonetimi.exe -DestinationPath StokYonetimi-${{ matrix.name }}.zip
         shell: pwsh
