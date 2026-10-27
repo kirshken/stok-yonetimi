@@ -1,0 +1,9 @@
+dist/
+build/
+*.spec
+__pycache__/
+stok.db*
+yedekler/
+images/
+paylas/
+config.json

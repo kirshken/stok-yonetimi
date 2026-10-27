@@ -1,0 +1,135 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Stok Yönetimi</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--b:#2563eb;--g:#16a34a;--r:#dc2626;--o:#d97706;--bg:#f3f4f6;--c:#fff;--t:#111827;--m:#6b7280;--bd:#e5e7eb}
+*{box-sizing:border-box}body{margin:0;font:15px -apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--t)}
+nav{background:#111827;display:flex;gap:2px;padding:0 12px;position:sticky;top:0;z-index:5}
+nav button{background:none;border:0;color:#cbd5e1;padding:14px 16px;font-size:15px;cursor:pointer}
+nav button.on{color:#fff;border-bottom:3px solid var(--b)}
+main{max-width:1100px;margin:16px auto;padding:0 12px}
+.card{background:var(--c);border:1px solid var(--bd);border-radius:10px;padding:16px;margin-bottom:14px}
+h2{margin:0 0 12px;font-size:18px}h3{margin:14px 0 8px;font-size:15px}
+input,select,textarea{padding:9px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:15px;width:100%;background:#fff}
+label{display:block;font-size:12px;color:var(--m);margin:8px 0 3px}
+button.p,button.s,button.d{padding:9px 14px;border-radius:7px;border:0;cursor:pointer;font-size:14px}
+button.p{background:var(--b);color:#fff}button.s{background:#e5e7eb}button.d{background:#fee2e2;color:var(--r)}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:140px}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);font-size:14px}th{color:var(--m);font-size:12px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat{background:var(--c);border:1px solid var(--bd);border-radius:10px;padding:14px}.stat b{font-size:26px;display:block}
+.scan{font-size:22px;padding:14px;border:2px solid var(--b)}
+.msg{padding:12px;border-radius:8px;margin:10px 0;font-size:16px}.ok{background:#dcfce7;color:#14532d}.err{background:#fee2e2;color:#7f1d1d}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;background:#e5e7eb}.tag.r{background:#fee2e2;color:var(--r)}.tag.o{background:#fef3c7;color:var(--o)}.tag.g{background:#dcfce7;color:var(--g)}
+.thumb{width:44px;height:44px;object-fit:cover;border-radius:6px;background:#eee;vertical-align:middle}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:flex-start;justify-content:center;overflow:auto;z-index:10;padding:20px}
+.modal.show{display:flex}.modal .card{width:760px;max-width:100%}
+.var{border:1px dashed #cbd5e1;border-radius:8px;padding:10px;margin-bottom:8px}
+.pv{max-width:140px;max-height:140px;border-radius:8px;display:block;margin:6px 0}
+.hide{display:none}.m{color:var(--m)}
+</style></head><body>
+<nav id="nav"></nav><main id="main"></main>
+<div class="modal" id="modal"><div class="card" id="mbody"></div></div>
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TABS=[['dash','Panel'],['in','Stok Girişi'],['out','Stok Çıkışı'],['prod','Ürünler'],['batch','Partiler / SKT'],['mov','Hareketler'],['set','Ayarlar']];
+let tab=localStorage.tab||'dash', fields=[], S={inLot:'',inExp:'',ref:''};
+async function api(p,o={}){const r=await fetch(p,o);let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw Object.assign(new Error(j.error||r.statusText),{data:j});return j}
+const post=(p,b)=>api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+function beep(ok){try{const a=new AudioContext(),o=a.createOscillator();o.frequency.value=ok?880:220;o.connect(a.destination);o.start();o.stop(a.currentTime+(ok?.08:.35))}catch(e){}}
+function nav(){$('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k==tab?'on':''}" onclick="go('${k}')">${l}</button>`).join('')}
+async function go(t){tab=t;localStorage.tab=t;nav();fields=await api('/api/fields');await V[t]()}
+const fmtExp=e=>{if(!e)return '<span class="m">-</span>';const d=(new Date(e)-new Date(new Date().toDateString()))/864e5;return `<span class="tag ${d<0?'r':d<=30?'o':'g'}">${e}${d<0?' (geçmiş)':d<=30?` (${d} gün)`:''}</span>`};
+const V={};
+V.dash=async()=>{const d=await api('/api/dashboard');
+$('#main').innerHTML=`<div class="stats"><div class="stat"><b>${d.product_count}</b>Ürün</div><div class="stat"><b>${d.total_stock}</b>Toplam stok</div><div class="stat"><b>${d.today_in}</b>Bugün giriş</div><div class="stat"><b>${d.today_out}</b>Bugün çıkış</div></div><br>
+<div class="card"><h2>⛔ SKT'si geçmiş (${d.expired.length})</h2>${bt(d.expired)}</div>
+<div class="card"><h2>⏰ 30 gün içinde SKT (${d.expiring.length})</h2>${bt(d.expiring)}</div>
+<div class="card"><h2>📉 Minimum stok altı (${d.low.length})</h2><table><tr><th>Ürün</th><th>Stok</th><th>Min</th></tr>${d.low.map(p=>`<tr><td>${esc(p.name)}</td><td>${p.stock}</td><td>${p.min_stock}</td></tr>`).join('')||'<tr><td class="m">Yok</td></tr>'}</table></div>`};
+const bt=a=>`<table><tr><th>Ürün</th><th>Varyant</th><th>Barkod</th><th>Parti</th><th>SKT</th><th>Adet</th><th></th></tr>${a.map(b=>`<tr><td>${esc(b.pname)}</td><td>${esc(b.sname)}</td><td>${esc(b.barcode)}</td><td>${esc(b.lot)}</td><td>${fmtExp(b.expiry)}</td><td>${b.qty}</td><td><button class="s" onclick="adjDlg(${b.id},${b.qty},'${esc(b.pname).replace(/'/g,'')}')">Düzelt</button></td></tr>`).join('')||'<tr><td class="m">Kayıt yok</td></tr>'}</table>`;
+
+V.in=async()=>{
+$('#main').innerHTML=`<div class="card"><h2>Stok Girişi (Inbound)</h2>
+<div class="row"><div><label>Parti / Lot no (opsiyonel)</label><input id="lot" value="${esc(S.inLot)}"></div><div><label>SKT (YYYY-AA-GG)</label><input id="exp" type="date" value="${esc(S.inExp)}"></div><div><label>Her okutmada eklenecek adet</label><input id="qty" type="number" min="1" value="1"></div></div>
+<label>Barkod okut</label><input id="bc" class="scan" autofocus autocomplete="off" placeholder="Barkodu okutun…">
+<p class="m">Aynı parti/SKT ile art arda okutabilirsiniz; her okutma o partiye adet ekler. Parti/SKT değiştirmek için alanları güncelleyin.</p><div id="res"></div><h3>Bu oturum</h3><table id="log"></table></div>`;
+$('#bc').focus();
+for(const i of['lot','exp'])$('#'+i).onchange=()=>{S.inLot=$('#lot').value;S.inExp=$('#exp').value};
+$('#bc').onkeydown=async e=>{if(e.key!='Enter')return;const bc=e.target.value.trim();if(!bc)return;e.target.value='';
+ try{const r=await post('/api/inbound',{barcode:bc,qty:$('#qty').value,lot:$('#lot').value,expiry:$('#exp').value});beep(1);
+  $('#res').innerHTML=`<div class="msg ok">✔ ${esc(r.product)} – ${esc(r.sku)} +${r.qty} ${r.expiry?'(SKT '+r.expiry+')':''}</div>`;
+  $('#log').insertAdjacentHTML('afterbegin',`<tr><td>${new Date().toLocaleTimeString()}</td><td>${esc(r.product)} / ${esc(r.sku)}</td><td>+${r.qty}</td><td>${esc(r.lot||'')} ${r.expiry||''}</td><td><button class="d" onclick="undo(${r.movement_id},this)">Geri al</button></td></tr>`)}
+ catch(er){beep(0);if(er.message=='NOT_FOUND'){$('#res').innerHTML=`<div class="msg err">Barkod tanımlı değil: <b>${esc(bc)}</b> <button class="p" onclick="editProd(null,'${esc(bc)}')">Şimdi tanımla</button></div>`}else $('#res').innerHTML=`<div class="msg err">${esc(er.message)}</div>`}
+ $('#bc').focus()}};
+async function undo(id,btn){try{await post('/api/undo/'+id,{});btn.outerHTML='<span class="tag">geri alındı</span>'}catch(e){alert(e.message)}}
+
+V.out=async()=>{
+$('#main').innerHTML=`<div class="card"><h2>Stok Çıkışı (Outbound)</h2>
+<label>Sipariş no (diğer panelden)</label><input id="ref" value="${esc(S.ref)}" placeholder="Sipariş numarası">
+<label>Barkod okut (her okutma = 1 adet, EN YAKIN SKT'den düşer)</label><input id="bc" class="scan" autocomplete="off" placeholder="Barkodu okutun…">
+<div id="res"></div><h3>Bu sipariş / oturum</h3><table id="log"></table></div>`;
+(S.ref?$('#bc'):$('#ref')).focus();
+$('#ref').onkeydown=e=>{if(e.key=='Enter'){S.ref=e.target.value.trim();$('#bc').focus()}};
+$('#ref').onchange=e=>S.ref=e.target.value.trim();
+$('#bc').onkeydown=async e=>{if(e.key!='Enter')return;const bc=e.target.value.trim();if(!bc)return;e.target.value='';S.ref=$('#ref').value.trim();
+ try{const r=await post('/api/outbound',{barcode:bc,ref:S.ref});beep(1);
+  $('#res').innerHTML=`<div class="msg ok">✔ ${esc(r.product)} – ${esc(r.sku)} (parti ${esc(r.lot||'-')}, SKT ${r.expiry||'-'}) · kalan stok: ${r.left}</div>`;
+  $('#log').insertAdjacentHTML('afterbegin',`<tr><td>${new Date().toLocaleTimeString()}</td><td>${esc(S.ref)}</td><td>${esc(r.product)} / ${esc(r.sku)}</td><td>${esc(r.lot||'')} ${r.expiry||''}</td><td><button class="d" onclick="undo(${r.movement_id},this)">Geri al</button></td></tr>`)}
+ catch(er){beep(0);$('#res').innerHTML=`<div class="msg err">✖ ${esc(er.message)} (${esc(bc)})</div>`}
+ $('#bc').focus()}};
+
+let PL=[];
+V.prod=async()=>{PL=await api('/api/products');
+$('#main').innerHTML=`<div class="card"><div class="row"><input id="q" placeholder="Ara: ürün, marka, barkod…" style="flex:3"><button class="p" onclick="editProd()">+ Yeni ürün</button><button class="s" onclick="impDlg()">CSV içe aktar</button></div><div id="pl"></div></div>`;
+$('#q').oninput=rp;rp()};
+function rp(){const q=$('#q').value.toLowerCase();$('#pl').innerHTML=`<table><tr><th></th><th>Ürün</th><th>Marka</th><th>Varyantlar</th><th>Stok</th><th></th></tr>`+PL.filter(p=>!q||(p.name+p.brand+p.category+p.skus.map(s=>s.barcode+s.name).join(' ')).toLowerCase().includes(q)).map(p=>`<tr><td>${p.image?`<img class="thumb" src="/img/${p.image}">`:''}</td><td><b>${esc(p.name)}</b><br><span class="m">${esc(p.category||'')}</span></td><td>${esc(p.brand||'')}</td><td>${p.skus.map(s=>`${esc(s.name)} <span class="m">${esc(s.barcode)}${s.weight_g?' · '+s.weight_g+' g':''}</span>`).join('<br>')}</td><td><span class="tag ${p.stock<=p.min_stock?'r':'g'}">${p.stock}</span></td><td><button class="s" onclick="editProd(${p.id})">Düzenle</button></td></tr>`).join('')+'</table>'}
+function fieldInputs(scope,attrs,pre){return fields.filter(f=>f.scope==scope).map(f=>`<div><label>${esc(f.name)}</label><input data-f="${pre}" data-n="${esc(f.name)}" value="${esc((attrs||{})[f.name]||'')}"></div>`).join('')}
+function skuHtml(s={}){return `<div class="var" data-id="${s.id||''}"><div class="row"><div><label>Varyant adı</label><input class="sn" value="${esc(s.name||'Standart')}"></div><div><label>Barkod</label><input class="sb" value="${esc(s.barcode||'')}"></div><div><label>Gramaj (g)</label><input class="sw" type="number" step="any" value="${s.weight_g??''}"></div></div><div class="row">${fieldInputs('sku',s.attrs,'s')}</div></div>`}
+async function editProd(id,bc){fields=await api('/api/fields');const p=id?PL.find(x=>x.id==id)||(await api('/api/products')).find(x=>x.id==id):{skus:[{barcode:bc||''}],track_expiry:1,unit:'adet',min_stock:0,attrs:{}};
+$('#mbody').innerHTML=`<h2>${id?'Ürünü düzenle':'Yeni ürün'}</h2>
+<div class="row"><div style="flex:2"><label>Ürün adı *</label><input id="pn" value="${esc(p.name||'')}"></div><div><label>Marka</label><input id="pb" value="${esc(p.brand||'')}"></div><div><label>Kategori</label><input id="pc" value="${esc(p.category||'')}"></div></div>
+<div class="row"><div><label>Birim</label><input id="pu" value="${esc(p.unit||'adet')}"></div><div><label>Minimum stok uyarısı</label><input id="pm" type="number" value="${p.min_stock||0}"></div><div><label>SKT takibi</label><select id="pt"><option value="1" ${p.track_expiry?'selected':''}>Var (giriş SKT zorunlu)</option><option value="0" ${!p.track_expiry?'selected':''}>Yok</option></select></div></div>
+<div class="row">${fieldInputs('product',p.attrs,'p')}</div>
+<label>Not</label><textarea id="pno" rows="2">${esc(p.notes||'')}</textarea>
+<label>Görsel</label>${p.image?`<img class="pv" id="pv" src="/img/${p.image}">`:'<img class="pv hide" id="pv">'}<input type="file" id="pi" accept="image/*">
+<h3>Varyantlar & barkodlar</h3><div id="sk">${p.skus.map(skuHtml).join('')}</div><button class="s" onclick="$('#sk').insertAdjacentHTML('beforeend',skuHtml())">+ Varyant ekle</button>
+<div id="perr"></div><div class="row" style="margin-top:14px"><button class="p" onclick="saveProd(${id||0})">Kaydet</button><button class="s" onclick="closeM()">İptal</button>${id?`<button class="d" onclick="delProd(${id})">Sil</button>`:''}</div>`;
+$('#modal').classList.add('show');$('#pi').onchange=e=>{const f=e.target.files[0];if(f){$('#pv').src=URL.createObjectURL(f);$('#pv').classList.remove('hide')}};
+setTimeout(()=>(bc?$('#pn'):$('#pn')).focus(),50)}
+const closeM=()=>$('#modal').classList.remove('show');
+const attrsOf=(root,k)=>{const o={};root.querySelectorAll(`[data-f=${k}]`).forEach(i=>{if(i.value)o[i.dataset.n]=i.value});return o};
+async function saveProd(id){const body={name:$('#pn').value,brand:$('#pb').value,category:$('#pc').value,unit:$('#pu').value,min_stock:$('#pm').value,track_expiry:$('#pt').value=='1',notes:$('#pno').value,attrs:attrsOf($('#mbody'),'p'),
+ skus:[...document.querySelectorAll('.var')].map(v=>({id:v.dataset.id?+v.dataset.id:undefined,name:v.querySelector('.sn').value,barcode:v.querySelector('.sb').value,weight_g:v.querySelector('.sw').value,attrs:attrsOf(v,'s')})).filter(s=>s.barcode||s.id)};
+ try{let pid=id;if(id)await api('/api/products/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});else pid=(await post('/api/products',body)).id;
+  const f=$('#pi').files[0];if(f)await api(`/api/products/${pid}/image`,{method:'POST',headers:{'Content-Type':f.type||'image/jpeg'},body:f});
+  closeM();go(tab)}catch(e){$('#perr').innerHTML=`<div class="msg err">${esc(e.message)}</div>`}}
+async function delProd(id){if(confirm('Bu ürün listeden kaldırılsın mı? (hareket geçmişi korunur)')){await api('/api/products/'+id,{method:'DELETE'});closeM();go('prod')}}
+function impDlg(){$('#mbody').innerHTML=`<h2>CSV içe aktar</h2><p class="m">Başlıklar: <code>urun;marka;kategori;varyant;barkod;gramaj</code> (noktalı virgül veya virgül). Aynı ürün adı tekrarlanırsa varyant olarak eklenir. Mevcut barkodlar atlanır.</p><input type="file" id="cf" accept=".csv,text/csv"><div id="ir"></div><div class="row" style="margin-top:12px"><button class="p" onclick="doImp()">İçe aktar</button><button class="s" onclick="closeM()">Kapat</button></div>`;$('#modal').classList.add('show')}
+async function doImp(){const f=$('#cf').files[0];if(!f)return;try{const r=await api('/api/import',{method:'POST',headers:{'Content-Type':'text/plain'},body:await f.text()});$('#ir').innerHTML=`<div class="msg ok">${r.imported} varyant eklendi</div>`;PL=await api('/api/products')}catch(e){$('#ir').innerHTML=`<div class="msg err">${esc(e.message)}</div>`}}
+
+V.batch=async()=>{$('#main').innerHTML=`<div class="card"><h2>Partiler (SKT sırasıyla)</h2>${bt(await api('/api/batches'))}<p><a href="/api/export/stok.csv">⬇ Stok CSV</a></p></div>`};
+V.mov=async()=>{$('#main').innerHTML=`<div class="card"><h2>Hareketler</h2><div class="row"><select id="ft"><option value="">Tümü</option><option value="in">Giriş</option><option value="out">Çıkış</option><option value="undo">Geri alma</option><option value="adj">Düzeltme/Sayım/İmha</option></select><input id="fr" placeholder="Sipariş no ara"></div><div id="ml"></div><p><a href="/api/export/hareketler.csv">⬇ Hareketler CSV</a></p></div>`;
+const load=async()=>{const m=await api(`/api/movements?type=${$('#ft').value}&ref=${encodeURIComponent($('#fr').value)}`);$('#ml').innerHTML=`<table><tr><th>Zaman</th><th>Tip</th><th>Ürün</th><th>Parti/SKT</th><th>Adet</th><th>Sipariş</th></tr>${m.map(x=>`<tr style="${x.undone?'opacity:.45;text-decoration:line-through':''}"><td>${x.ts}</td><td>${{in:'Giriş',out:'Çıkış',undo:'Geri alma',adj:'Düzeltme'}[x.type]}</td><td>${esc(x.pname)} / ${esc(x.sname)}</td><td>${esc(x.lot||'')} ${x.expiry||''}</td><td>${x.qty}</td><td>${x.type=='adj'?esc(x.ref+': '+(x.note||'')):esc(x.ref||x.note||'')}</td></tr>`).join('')}</table>`};
+$('#ft').onchange=load;$('#fr').oninput=load;load()};
+V.set=async()=>{$('#main').innerHTML=`<div class="card"><h2>Özel alanlar</h2><p class="m">Ürün, varyant veya parti için kendi özelliklerinizi ekleyin (ör. Menşei, Raf ömrü, Alerjen). Ürün/varyant ekranında görünür.</p>
+<table>${fields.map(f=>`<tr><td>${{product:'Ürün',sku:'Varyant'}[f.scope]}</td><td>${esc(f.name)}</td><td><button class="d" onclick="delF(${f.id})">Sil</button></td></tr>`).join('')}</table>
+<div class="row" style="margin-top:10px"><select id="fs"><option value="product">Ürün alanı</option><option value="sku">Varyant alanı</option></select><input id="fn" placeholder="Alan adı"><button class="p" onclick="addF()">Ekle</button></div></div>
+<div class="card" id="bk"></div>`;bkLoad()};
+function adjDlg(id,q,n){$('#mbody').innerHTML=`<h2>Parti düzeltme: ${n}</h2><p class="m">Mevcut: ${q}. Sayım farkı, fire veya imha için yeni adedi girin. Kayıt hareketlere işlenir.</p><label>Yeni adet</label><input id="aq" type="number" min="0" value="${q}"><label>Tür</label><select id="ak"><option value="sayim">Sayım düzeltme</option><option value="imha">İmha / SKT geçti</option><option value="fire">Fire / hasar</option></select><label>Gerekçe *</label><input id="ar"><div id="aerr"></div><div class="row" style="margin-top:12px"><button class="p" onclick="doAdj(${id})">Kaydet</button><button class="s" onclick="closeM()">İptal</button></div>`;$('#modal').classList.add('show')}
+async function doAdj(id){try{await post('/api/adjust',{batch_id:id,new_qty:$('#aq').value,kind:$('#ak').value,reason:$('#ar').value});closeM();go(tab)}catch(e){$('#aerr').innerHTML=`<div class="msg err">${esc(e.message)}</div>`}}
+async function bkLoad(){const b=await api('/api/backup/list');
+$('#bk').innerHTML=`<h2>Yedekleme</h2><p>Otomatik: açılışta, kapanışta ve değişiklik olduktan en geç ~2 dk sonra. Son yedek: <b>${b.last||'bu oturumda henüz yok'}</b></p>
+<p class="m">Veri klasörü: <code>${esc(b.data_dir)}</code> (yedekler <code>yedekler/</code> içinde). Son 50 yedek + son 90 günün her günü saklanır.</p>
+<label>Ek yedek klasörü (iCloud Drive / Google Drive / Dropbox / harici disk içinde bir klasör) — her yedek buraya da kopyalanır</label>
+<div class="row"><input id="md" value="${esc(b.mirror_dir)}" placeholder="/Users/siz/Google Drive/StokYedek  veya  D:\\StokYedek" style="flex:3"><button class="p" onclick="saveMd()">Kaydet</button></div>
+${b.mirror_err?`<div class="msg err">Ek klasöre kopyalanamadı: ${esc(b.mirror_err)}</div>`:''}
+<div class="row" style="margin:12px 0"><button class="p" onclick="bkNow()">Şimdi yedek al</button><button class="s" onclick="$('#rf').click()">Yedekten geri yükle (zip seç)</button><input type="file" id="rf" accept=".zip" class="hide" onchange="bkRestoreFile(this.files[0])"></div>
+<table><tr><th>Yedek</th><th>Boyut</th><th></th></tr>${b.files.slice(0,30).map(f=>`<tr><td>${esc(f.name)}</td><td>${f.kb} KB</td><td><a href="/api/backup/download?name=${encodeURIComponent(f.name)}">indir</a> · <a href="#" onclick="bkRestoreLocal('${esc(f.name)}');return false">geri yükle</a></td></tr>`).join('')}</table>`}
+async function saveMd(){try{await post('/api/backup/config',{mirror_dir:$('#md').value});bkLoad()}catch(e){alert(e.message)}}
+async function bkNow(){await post('/api/backup/now',{});bkLoad()}
+async function bkRestoreLocal(n){if(confirm('Mevcut veriler bu yedekle DEĞİŞTİRİLECEK (öncesinde otomatik yedek alınır). Devam?')){try{await post('/api/backup/restore-local',{name:n});alert('Geri yüklendi');go('dash')}catch(e){alert(e.message)}}}
+async function bkRestoreFile(f){if(f&&confirm('Mevcut veriler bu yedekle DEĞİŞTİRİLECEK (öncesinde otomatik yedek alınır). Devam?')){try{await api('/api/backup/restore',{method:'POST',headers:{'Content-Type':'application/zip'},body:f});alert('Geri yüklendi');go('dash')}catch(e){alert(e.message)}}}
+async function addF(){if(!$('#fn').value.trim())return;await post('/api/fields',{scope:$('#fs').value,name:$('#fn').value});go('set')}
+async function delF(id){await api('/api/fields/'+id,{method:'DELETE'});go('set')}
+document.addEventListener('keydown',e=>{if(e.key=='Escape')closeM()});
+go(tab);
+</script></body></html>

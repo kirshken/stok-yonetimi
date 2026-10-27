@@ -1,0 +1,25 @@
+name: build
+on: { push: { branches: [main] }, workflow_dispatch: {} }
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, name: Windows, sep: ';' }
+          - { os: macos-latest,   name: macOS-AppleSilicon, sep: ':' }
+          - { os: macos-15-intel, name: macOS-Intel, sep: ':' }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install pyinstaller
+      - run: pyinstaller --noconfirm --onefile --name StokYonetimi --add-data "index.html${{ matrix.sep }}." app.py
+      - if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/StokYonetimi.exe -DestinationPath StokYonetimi-${{ matrix.name }}.zip
+        shell: pwsh
+      - if: runner.os != 'Windows'
+        run: cd dist && zip ../StokYonetimi-${{ matrix.name }}.zip StokYonetimi
+      - uses: actions/upload-artifact@v4
+        with: { name: StokYonetimi-${{ matrix.name }}, path: StokYonetimi-${{ matrix.name }}.zip }
