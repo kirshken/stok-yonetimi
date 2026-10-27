@@ -273,6 +273,7 @@ def import_csv(c, text):
         r = {}; pa = {}; sa = {}
         for h, k, v in zip(head, keys, row):
             v = v.strip()
+            if v.startswith('="') and v.endswith('"'): v = v[2:-1]
             if k.startswith("urun_ozel:"):
                 if v: pa[h.split(":", 1)[1].strip()] = v
             elif k.startswith("varyant_ozel:"):
@@ -298,27 +299,67 @@ def import_csv(c, text):
         res["imported"] += 1
     return res
 
+def xl(v):
+    """Excel barkodu bilimsel gösterime çevirmesin diye ="..." biçimi (içe aktarma bunu geri çözer)."""
+    return f'="{v}"' if v not in (None, "") else ""
+
 def export_products(c):
-    fl = rows(c, "SELECT * FROM fields ORDER BY scope,name")
-    head = ["urun", "marka", "kategori", "varyant", "barkod", "gramaj", "birim", "min_stok", "skt_takibi", "notlar", "mevcut_stok"]
-    head += [("urun_ozel:" if f["scope"] == "product" else "varyant_ozel:") + f["name"] for f in fl if f["scope"] in ("product", "sku")]
-    out = []
+    fl = [f for f in rows(c, "SELECT * FROM fields ORDER BY scope,name") if f["scope"] in ("product", "sku")]
+    head = ["urun", "marka", "kategori", "varyant", "barkod", "gramaj", "birim", "min_stok", "skt_takibi", "notlar",
+            "mevcut_stok", "urun_toplam_stok", "stok_durumu", "en_yakin_skt", "parti_sayisi", "skt_gecmis_adet", "gorsel"]
+    head += [("urun_ozel:" if f["scope"] == "product" else "varyant_ozel:") + f["name"] for f in fl]
+    t = date.today().isoformat(); out = []
     for p in products_list(c):
+        durum = "Stokta yok" if p["stock"] == 0 else ("Düşük" if p["stock"] <= p["min_stock"] else "Yeterli")
         for s in p["skus"]:
-            r = [p["name"], p["brand"], p["category"], s["name"], s["barcode"], s["weight_g"], p["unit"], p["min_stock"], "evet" if p["track_expiry"] else "hayir", p["notes"], s["stock"]]
-            r += [(p["attrs"] if f["scope"] == "product" else s["attrs"]).get(f["name"], "") for f in fl if f["scope"] in ("product", "sku")]
+            b = rows(c, "SELECT expiry, qty FROM batches WHERE sku_id=? AND qty>0", (s["id"],))
+            near = min([x["expiry"] for x in b if x["expiry"]], default="")
+            exp_q = sum(x["qty"] for x in b if x["expiry"] and x["expiry"] < t)
+            r = [p["name"], p["brand"], p["category"], s["name"], xl(s["barcode"]), s["weight_g"], p["unit"], p["min_stock"],
+                 "evet" if p["track_expiry"] else "hayir", p["notes"], s["stock"], p["stock"], durum, near, len(b), exp_q, "evet" if p["image"] else "hayir"]
+            r += [(p["attrs"] if f["scope"] == "product" else s["attrs"]).get(f["name"], "") for f in fl]
             out.append(r)
     return csv_out(head, out)
+
+def export_batches(c):
+    t = date.today()
+    out = []
+    for b in rows(c, "SELECT b.*, s.barcode, s.name sname, s.weight_g, p.name pname, p.brand, p.category, p.unit FROM batches b JOIN skus s ON s.id=b.sku_id JOIN products p ON p.id=s.product_id WHERE b.qty>0 AND p.active=1 ORDER BY b.expiry IS NULL, b.expiry, p.name"):
+        left = (date.fromisoformat(b["expiry"]) - t).days if b["expiry"] else ""
+        st = "" if left == "" else ("SKT geçmiş" if left < 0 else ("30 gün içinde" if left <= 30 else "Normal"))
+        out.append([b["pname"], b["brand"], b["category"], b["sname"], xl(b["barcode"]), b["weight_g"], b["unit"], b["lot"], b["expiry"], left, st, b["qty"], b["created"]])
+    return csv_out(["Ürün", "Marka", "Kategori", "Varyant", "Barkod", "Gramaj (g)", "Birim", "Parti", "SKT", "Kalan gün", "SKT durumu", "Adet", "İlk giriş"], out)
+
+def export_movements(c):
+    ms = rows(c, "SELECT m.*, s.barcode, s.name sname, p.name pname, p.brand, p.category, b.lot, b.expiry FROM movements m LEFT JOIN skus s ON s.id=m.sku_id LEFT JOIN products p ON p.id=s.product_id LEFT JOIN batches b ON b.id=m.batch_id ORDER BY m.id")
+    types = {m["id"]: m["type"] for m in ms}; out = []
+    for m in ms:
+        tr = {"in": "Giriş", "out": "Çıkış", "undo": "Geri alma", "adj": "Düzeltme"}.get(m["type"], m["type"])
+        if m["type"] == "in": eff = m["qty"]
+        elif m["type"] == "out": eff = -m["qty"]
+        elif m["type"] == "adj": eff = m["qty"]
+        else:
+            mm = re.match(r"#(\d+)", m["note"] or ""); orig = types.get(int(mm[1])) if mm else None
+            eff = m["qty"] if orig == "out" else -m["qty"]
+        ref, note = (m["ref"], m["note"]) if m["type"] != "adj" else ("", f"{m['ref']}: {m['note']}")
+        out.append([m["ts"], tr, m["pname"], m["brand"], m["category"], m["sname"], xl(m["barcode"]), m["lot"], m["expiry"], m["qty"], eff, ref, note, "evet" if m["undone"] else ""])
+    return csv_out(["Zaman", "Tür", "Ürün", "Marka", "Kategori", "Varyant", "Barkod", "Parti", "SKT", "Adet", "Stok etkisi", "Sipariş / referans", "Not", "Geri alındı"], out)
 
 # ---------------- Ağ modu (telefon): HTTPS + PIN ----------------
 LAN = {"srv": None, "port": None, "err": None, "tls": False, "ips": []}
 SESS = {}; FAILS = {}
 LOGIN_HTML = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Giriş</title>
 <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
-.b{background:#1e293b;padding:28px;border-radius:18px;width:min(92vw,340px)}h2{margin:0 0 14px}input{width:100%;padding:14px;font-size:22px;border-radius:10px;border:0;text-align:center;letter-spacing:6px}
-button{width:100%;margin-top:12px;padding:14px;font-size:16px;border:0;border-radius:10px;background:#6366f1;color:#fff}#e{color:#fca5a5;margin-top:10px;min-height:20px}</style>
-<div class=b><h2>Stok Yönetimi</h2><input id=p type=password inputmode=numeric autocomplete=current-password placeholder="PIN" autofocus><button onclick=go()>Giriş</button><div id=e></div></div>
-<script>p.onkeydown=e=>e.key=='Enter'&&go();async function go(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:p.value})});if(r.ok)location.reload();else e.textContent=(await r.json()).error}</script>"""
+.b{background:#1e293b;padding:24px;border-radius:20px;width:min(94vw,340px)}h2{margin:0 0 6px}p{margin:0 0 12px;color:#94a3b8;font-size:13px}
+input{width:100%;padding:14px;font-size:22px;border-radius:12px;border:0;text-align:center;letter-spacing:6px;box-sizing:border-box}
+.k{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.k button{padding:16px 0;font-size:22px;border:0;border-radius:12px;background:#334155;color:#fff}
+.k button:active{background:#475569}button.go{width:100%;margin-top:10px;padding:15px;font-size:17px;border:0;border-radius:12px;background:#6366f1;color:#fff;font-weight:600}#e{color:#fca5a5;margin-top:10px;min-height:20px;text-align:center}</style>
+<div class=b><h2>Stok Yönetimi</h2><p>PIN’i yazın, yapıştırın ya da tuşları kullanın</p><input id=pin type=password autocomplete=off autocapitalize=off>
+<div class=k></div><button class=go onclick=go()>Giriş</button><div id=e></div></div>
+<script>const P=document.getElementById('pin'),K=document.querySelector('.k');
+['1','2','3','4','5','6','7','8','9','C','0','⌫'].forEach(t=>{const b=document.createElement('button');b.textContent=t;b.type='button';b.onclick=()=>{if(t=='C')P.value='';else if(t=='⌫')P.value=P.value.slice(0,-1);else P.value+=t};K.appendChild(b)});
+P.onkeydown=ev=>{if(ev.key=='Enter')go()};
+async function go(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:P.value})});if(r.ok)location.reload();else{document.getElementById('e').textContent=(await r.json()).error;P.value=''}}</script>"""
 
 def hash_pin(pin, salt): return hashlib.pbkdf2_hmac("sha256", pin.encode(), bytes.fromhex(salt), 120000).hex()
 
@@ -406,6 +447,28 @@ def lan_set(d):
     return lan_status()
 
 PORT_ACTUAL = [PORT]
+
+def branding():
+    c = cfg()
+    return {"accent": c.get("brand_accent") or "#6366f1", "name": c.get("brand_name") or "Stok Yönetimi", "logo": c.get("brand_logo"), "mode": c.get("brand_mode") or "auto"}
+
+def set_branding(d):
+    upd = {}
+    if "accent" in d:
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", d["accent"] or ""): raise Err("Renk #RRGGBB biçiminde olmalı")
+        upd["brand_accent"] = d["accent"]
+    if "name" in d: upd["brand_name"] = (d["name"] or "").strip()[:40]
+    if "mode" in d:
+        if d["mode"] not in ("auto", "light", "dark"): raise Err("Geçersiz tema")
+        upd["brand_mode"] = d["mode"]
+    save_cfg(upd); return branding()
+
+def drop_logo():
+    old = cfg().get("brand_logo")
+    if old:
+        try: os.remove(os.path.join(IMG, os.path.basename(old)))
+        except OSError: pass
+    save_cfg({"brand_logo": None})
 
 class H(BaseHTTPRequestHandler):
     lan = False
@@ -496,17 +559,19 @@ class H(BaseHTTPRequestHandler):
                         if qs.get("from"): w.append("m.ts>=?"); a.append(qs["from"] + " 00:00:00")
                         if qs.get("to"): w.append("m.ts<=?"); a.append(qs["to"] + " 23:59:59")
                         return self.send(200, rows(c, q + (" WHERE " + " AND ".join(w) if w else "") + " ORDER BY m.id DESC LIMIT ?", a + [int(qs.get("limit", 200))]))
-                    if path == "/api/export/stok.csv":
-                        d = [[b["pname"], b["sname"], b["barcode"], b["lot"], b["expiry"], b["qty"]] for b in rows(c, "SELECT b.*, s.barcode, s.name sname, p.name pname FROM batches b JOIN skus s ON s.id=b.sku_id JOIN products p ON p.id=s.product_id WHERE b.qty>0")]
-                        return self.send(200, csv_out(["Ürün", "Varyant", "Barkod", "Parti", "SKT", "Adet"], d), "text/csv", {"Content-Disposition": "attachment; filename=stok.csv"})
-                    if path == "/api/export/hareketler.csv":
-                        d = [[m["ts"], m["type"], m["pname"], m["sname"], m["barcode"], m["lot"], m["expiry"], m["qty"], m["ref"], m["undone"]] for m in rows(c, "SELECT m.*, s.barcode, p.name pname, s.name sname, b.lot, b.expiry FROM movements m LEFT JOIN skus s ON s.id=m.sku_id LEFT JOIN products p ON p.id=s.product_id LEFT JOIN batches b ON b.id=m.batch_id ORDER BY m.id")]
-                        return self.send(200, csv_out(["Zaman", "Tip", "Ürün", "Varyant", "Barkod", "Parti", "SKT", "Adet", "Referans", "Geri alındı"], d), "text/csv", {"Content-Disposition": "attachment; filename=hareketler.csv"})
+                    if path == "/api/export/stok.csv": return self.send(200, export_batches(c), "text/csv", {"Content-Disposition": "attachment; filename=stok-partiler.csv"})
+                    if path == "/api/export/hareketler.csv": return self.send(200, export_movements(c), "text/csv", {"Content-Disposition": "attachment; filename=hareketler.csv"})
+                    if path == "/api/branding": return self.send(200, branding())
                 elif method == "POST":
                     if path == "/api/products": return self.send(200, {"id": save_product(c, data)})
                     if path == "/api/inbound": return self.send(200, inbound(c, data))
                     if path == "/api/outbound": return self.send(200, outbound(c, data))
                     if path == "/api/lan": return self.send(200, lan_set(data))
+                    if path == "/api/branding": return self.send(200, set_branding(data))
+                    if path == "/api/branding/logo":
+                        ext = {"image/png": "png", "image/webp": "webp", "image/gif": "gif"}.get(self.headers.get("Content-Type"), "jpg")
+                        drop_logo(); fn = f"logo-{uuid.uuid4().hex[:8]}.{ext}"; open(os.path.join(IMG, fn), "wb").write(raw)
+                        save_cfg({"brand_logo": fn}); return self.send(200, branding())
                     if path == "/api/order-undo": return self.send(200, order_undo(c, data))
                     if path == "/api/adjust": return self.send(200, adjust(c, data))
                     if path == "/api/import": return self.send(200, import_csv(c, raw.decode("utf-8-sig")))
@@ -523,6 +588,7 @@ class H(BaseHTTPRequestHandler):
                     m = re.match(r"/api/products/(\d+)$", path)
                     if m: save_product(c, data, int(m[1])); return self.send(200, {"ok": True})
                 elif method == "DELETE":
+                    if path == "/api/branding/logo": drop_logo(); return self.send(200, branding())
                     m = re.match(r"/api/products/(\d+)$", path)
                     if m: c.execute("UPDATE products SET active=0 WHERE id=?", (int(m[1]),)); return self.send(200, {"ok": True})
                     m = re.match(r"/api/fields/(\d+)$", path)
